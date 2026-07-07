@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Answer Sheet Capture — Examination Management</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sidebar-brand">
+    <div class="logo-box"><i class="fas fa-graduation-cap"></i></div>
+    <div>
+      <h2>Examination</h2>
+      <span>College ERP System</span>
+    </div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="sidebar-nav-label">Examination Module</div>
+    <div class="nav-section">
+      <button class="nav-section-header" onclick="toggleSection(this.parentElement)"><i class="fas fa-th-large"></i><span>Dashboard</span><i class="fas fa-chevron-right arrow"></i></button>
+      <div class="nav-sub"><a href="../index.html"><i class="fas fa-circle" style="font-size:6px"></i><span>Overview</span></a></div>
+    </div>
+
+    <div class="nav-section">
+      <button class="nav-section-header" onclick="toggleSection(this.parentElement)"><i class="fas fa-calendar-alt"></i><span>Pre-Exam</span><i class="fas fa-chevron-right arrow"></i></button>
+      <div class="nav-sub">
+        <a href="../pre-exam/exam-creation.html"><i class="fas fa-circle" style="font-size:6px"></i><span>Exam Creation</span></a>
+        <a href="../pre-exam/eligibility.html"><i class="fas fa-circle" style="font-size:6px"></i><span>Eligibility</span></a>
+        <a href="../pre-exam/registration.html"><i class="fas fa-circle" style="font-size:6px"></i><span>Registration</span></a>
+        <a href="../pre-exam/timetable.html"><i class="fas fa-circle" style="font-size:6px"></i><span>Timetable</span></a>
+        <a href="../pre-exam/hall-ticket.html"><i class="fas fa-circle" style="font-size:6px"></i><span>Hall Ticket</span></a>
+        <a href="../pre-exam/seating.html"><i class="fas fa-circle" style="font-size:6px"></i><span>Seating Plan</span></a>
+        <a href="../pre-exam/invigilator.html"><i class="fas fa-circle" style="font-size:6px"></i><span>Invigilator Duty</span></a>
+      </div>
+    </div>
+
+    <div class="nav-section open">
+      <button class="nav-section-header" onclick="toggleSection(this.parentElement)"><i class="fas fa-pen-alt"></i><span>In-Exam</span><i class="fas fa-chevron-right arrow"></i></button>
+      <div class="nav-sub">
+        <a href="attendance.html"><i class="fas fa-circle" style="font-size:6px"></i><span>Exam-Day Attendance</span></a>
+        <a href="answer-sheet.html" class="active"><i class="fas fa-circle" style="font-size:6px"></i><span>Answer Sheet Capture</span></a>
+        <a href="malpractice.html"><i class="fas fa-circle" style="font-size:6px"></i><span>Malpractice & Special Cases</span></a>
+        <a href="dform.html"><i class="fas fa-circle" style="font-size:6px"></i><span>D-Form / Attendance Report</span></a>
+        <a href="collection.html"><i class="fas fa-circle" style="font-size:6px"></i><span>Collection & Dispatch</span></a>
+      </div>
+    </div>
+
+    <div class="nav-section">
+      <button class="nav-section-header" onclick="toggleSection(this.parentElement)"><i class="fas fa-check-double"></i><span>Post-Exam</span><i class="fas fa-chevron-right arrow"></i></button>
+      <div class="nav-sub">
+        <a href="../post-exam/bundle.html"><i class="fas fa-circle" style="font-size:6px"></i><span>Bundle Creation</span></a>
+        <a href="../post-exam/evaluator.html"><i class="fas fa-circle" style="font-size:6px"></i><span>Evaluator Assignment</span></a>
+        <a href="../post-exam/marks-entry.html"><i class="fas fa-circle" style="font-size:6px"></i><span>Marks Entry</span></a>
+        <a href="../post-exam/scrutiny.html"><i class="fas fa-circle" style="font-size:6px"></i><span>Scrutiny</span></a>
+        <a href="../post-exam/consolidation.html"><i class="fas fa-circle" style="font-size:6px"></i><span>Marks Consolidation</span></a>
+        <a href="../post-exam/result-processing.html"><i class="fas fa-circle" style="font-size:6px"></i><span>Result Processing</span></a>
+        <a href="../post-exam/result-freeze.html"><i class="fas fa-circle" style="font-size:6px"></i><span>Result Review & Freeze</span></a>
+        <a href="../post-exam/result-declaration.html"><i class="fas fa-circle" style="font-size:6px"></i><span>Result Declaration</span></a>
+        <a href="../post-exam/marks-memo.html"><i class="fas fa-circle" style="font-size:6px"></i><span>Marks Memo / Grade Card</span></a>
+        <a href="../post-exam/revaluation.html"><i class="fas fa-circle" style="font-size:6px"></i><span>Revaluation</span></a>
+        <a href="../post-exam/reports.html"><i class="fas fa-circle" style="font-size:6px"></i><span>Reports & Analytics</span></a>
+      </div>
+    </div>
+  </nav>
+  <div class="sidebar-footer" style="flex-wrap:wrap;gap:8px">
+    <div style="display:flex;align-items:center;gap:8px;width:100%">
+      <div class="avatar">IN</div>
+      <div style="min-width:0">
+        <div style="color:var(--text);font-weight:600;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Invigilator</div>
+        <div style="font-size:11px">invigilator</div>
+      </div>
+      <a href="../index.html" class="btn btn-sm" style="margin-left:auto;padding:4px 8px;font-size:10px;flex-shrink:0" title="Back to main app"><i class="fas fa-arrow-left"></i></a>
+    </div>
+  </div>
+</aside>
+
+<!-- MAIN CONTENT -->
+<div class="main">
+  <header class="topbar">
+    <div class="topbar-left">
+      <h1><i class="fas fa-file-alt"></i> Answer Sheet Capture</h1>
+      <div class="breadcrumb">Examination / In-Exam / <span>Answer Sheet Number Capture</span></div>
+    </div>
+    <div class="topbar-right">
+      <span class="mode-badge" style="background:#e0f2fe;color:#0369a1"><i class="fas fa-chalkboard-teacher"></i> Invigilator Login</span>
+      <span class="mode-badge" id="modeBadge"><i class="fas fa-university"></i> Autonomous Mode</span>
+      <div class="btn-group" style="gap:4px">
+        <button class="btn btn-sm" onclick="switchStandaloneMode('autonomous')" title="Autonomous">Auto</button>
+        <button class="btn btn-sm" onclick="switchStandaloneMode('affiliated')" title="Affiliated">Affl</button>
+        <button class="btn btn-sm" onclick="switchStandaloneMode('hybrid')" title="Hybrid">Hybrid</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="content" id="pageContent">
+    <!-- Content injected by JS -->
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modalTitle">Modal</h3>
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-footer" id="modalFooter">
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="closeModal()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script src="../js/data.js"></script>
+<script src="../js/core.js"></script>
+<script src="../js/create-flows.js"></script>
+<script src="../js/in-exam.js"></script>
+<script>
+  function renderCurrentPage() {
+    document.getElementById('pageContent').innerHTML = renderAnswerSheet();
+    updateModeBadge();
+  }
+  function switchStandaloneMode(mode) {
+    currentMode = mode;
+    renderCurrentPage();
+  }
+  renderCurrentPage();
+</script>
+</body>
+</html>
