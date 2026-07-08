@@ -14,7 +14,7 @@ const pageTitles = {
   'scrutiny': 'Scrutiny', 'consolidation': 'Marks Consolidation', 'result-processing': 'Result Processing',
   'result-freeze': 'Result Review & Freeze', 'result-declaration': 'Result Declaration', 'marks-memo': 'Marks Memo / Grade Card',
   'revaluation': 'Revaluation', 'reports': 'Reports & Analytics',
-  'student-result': 'My Result', 'student-revaluation': 'Apply Revaluation'
+  'student-result': 'My Result', 'student-revaluation': 'Apply Revaluation', 'student-seating': 'My Seating'
 };
 
 let currentPage = 'dashboard';
@@ -24,6 +24,11 @@ let currentMode = 'autonomous';
 // actually carries its label across pages instead of everything showing the
 // same hardcoded exam regardless of what you clicked.
 let currentExamLabel = 'Sem IV Regular Apr 2026';
+// The single demo student identity behind every "Student" role page
+// (My Result, Apply Revaluation, Hall Ticket, My Seating) — matches the
+// hardcoded "Aarav Sharma (S001)" already used in renderStudentResult, so
+// all student-facing pages agree on who is logged in.
+const CURRENT_STUDENT_ID = 'S001';
 
 const modeInfo = {
   autonomous: { label: 'Autonomous', icon: 'fa-university', desc: 'Full exam cycle managed by college' },
@@ -81,6 +86,13 @@ function openExam(label) {
     eligibilityApproved = false;
   }
   currentExamLabel = label;
+  // Keep the Autonomous/Affiliated/Hybrid badge and every mode-driven alert
+  // in sync with whichever exam is now open, instead of leaking whatever
+  // mode was last selected on the Exam Creation screen.
+  if (typeof recentExams !== 'undefined') {
+    const exam = recentExams.find(e => e.label === label);
+    if (exam) currentMode = exam.mode;
+  }
 }
 
 function renderAffiliatedNotApplicable(icon, title, message) {
@@ -139,7 +151,11 @@ function downloadReport(name) {
   var base = name || defaultReportName();
   var container = document.getElementById('pageContent');
   var table = container ? container.querySelector('table') : null;
-  if (table) { downloadBlob(base + '.csv', tableToCSV(table), 'text/csv;charset=utf-8'); showSuccessToast('Downloaded ' + base + '.csv'); }
+  // Leading UTF-8 BOM so Excel (which ignores the charset in the mime type
+  // and guesses from the bytes) reads non-ASCII characters like em dashes
+  // correctly instead of mangling them into garbled mojibake.
+  var BOM = String.fromCharCode(0xFEFF);
+  if (table) { downloadBlob(base + '.csv', BOM + tableToCSV(table), 'text/csv;charset=utf-8'); showSuccessToast('Downloaded ' + base + '.csv'); }
   else { downloadBlob(base + '.txt', base.replace(/-/g, ' ') + ' - generated ' + new Date().toLocaleString(), 'text/plain'); showSuccessToast('Downloaded ' + base + '.txt'); }
 }
 function showSuccessToast(msg) {
@@ -267,6 +283,7 @@ function renderPage(page) {
     case 'reports': c.innerHTML = renderReports(); break;
     case 'student-result': c.innerHTML = renderStudentResult(); break;
     case 'student-revaluation': c.innerHTML = renderStudentRevaluation(); break;
+    case 'student-seating': c.innerHTML = renderStudentSeating(); break;
     default: c.innerHTML = renderDashboard();
   }
 }

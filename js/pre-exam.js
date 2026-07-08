@@ -33,10 +33,22 @@ const examCreationCatalog = {
 // Mutable — "Create & Activate Exam" unshifts new records here so the Recent
 // Exams table actually grows as exams are created, instead of staying static.
 let recentExams = [
-  { label: 'Sem IV Regular Apr 2026', program: 'B.E. Computer', sem: 'IV', type: 'Regular', mode: 'autonomous', status: 'Active' },
-  { label: 'Sem VI Regular Apr 2026', program: 'B.E. Computer', sem: 'VI', type: 'Regular', mode: 'autonomous', status: 'Pre-Exam' },
-  { label: 'Sem II Supplementary Jan 2026', program: 'B.E. Computer', sem: 'II', type: 'Supplementary', mode: 'affiliated', status: 'Closed' },
+  { label: 'Sem IV Regular Apr 2026', program: 'B.E. Computer', sem: 'IV', type: 'Regular', mode: 'autonomous', status: 'Active', startDate: '10 Apr 2026', endDate: '20 Apr 2026', fee: 500 },
+  { label: 'Sem VI Regular Apr 2026', program: 'B.E. Computer', sem: 'VI', type: 'Regular', mode: 'autonomous', status: 'Pre-Exam', startDate: '08 Apr 2026', endDate: '22 Apr 2026', fee: 500 },
+  { label: 'Sem II Supplementary Jan 2026', program: 'B.E. Computer', sem: 'II', type: 'Supplementary', mode: 'affiliated', status: 'Closed', startDate: '12 Jan 2026', endDate: '20 Jan 2026', fee: 300 },
 ];
+
+function getCurrentExamFee() {
+  const exam = recentExams.find(e => e.label === currentExamLabel);
+  return exam && exam.fee ? exam.fee : 0;
+}
+
+// Converts a native <input type="date"> value (YYYY-MM-DD) to the
+// "DD Mon YYYY" display format already used across the timetable/exam data.
+function formatExamDate(isoDate) {
+  const [y, m, d] = isoDate.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+}
 
 function updateExamCreateBranches() {
   const programName = document.getElementById('examCreateProgram').value;
@@ -51,17 +63,31 @@ function createExam() {
   const branch = document.getElementById('examCreateBranch').value;
   const regulation = document.getElementById('examCreateRegulation').value;
   const examType = document.getElementById('examCreateType').value;
+  const startDateRaw = document.getElementById('examCreateStartDate').value;
+  const endDateRaw = document.getElementById('examCreateEndDate').value;
+  const feeRaw = document.getElementById('examCreateFee').value;
+  if (!startDateRaw || !endDateRaw) {
+    showToast('Please select both a start date and an end date');
+    return;
+  }
+  if (endDateRaw < startDateRaw) {
+    showToast('End date cannot be before the start date');
+    return;
+  }
+  const fee = Number(feeRaw) || 0;
+  const startDate = formatExamDate(startDateRaw);
+  const endDate = formatExamDate(endDateRaw);
   const semShort = semester.replace('Semester ', '');
   const programShort = 'B.E. ' + programName.replace('B.E. ', '').split(' ')[0];
   const label = `Sem ${semShort} ${examType} ${year}`;
-  recentExams.unshift({ label, program: programShort, sem: semShort, type: examType, mode: currentMode, status: 'Pre-Exam' });
+  recentExams.unshift({ label, program: programShort, sem: semShort, type: examType, mode: currentMode, status: 'Pre-Exam', startDate, endDate, fee });
   openExam(label);
   const m = modeInfo[currentMode];
   openModal('Exam Created Successfully', `
     <div class="text-center" style="padding:20px">
       <i class="fas fa-check-circle" style="font-size:48px;color:#059669"></i>
       <h3 style="margin-top:12px">Exam Created Successfully</h3>
-      <p class="text-muted">${label} has been created for ${programName} (${branch}), ${regulation}, under ${m.label} mode, and is ready for activation.</p>
+      <p class="text-muted">${label} has been created for ${programName} (${branch}), ${regulation}, under ${m.label} mode, scheduled from ${startDate} to ${endDate} with a registration fee of ₹${fee}, and is ready for activation.</p>
     </div>
   `, `<button class="btn btn-primary" onclick="closeModal();showPage('eligibility')"><i class="fas fa-arrow-right"></i> Proceed to Eligibility</button>`);
   showPage('exam-creation');
@@ -101,11 +127,57 @@ function openExamModal(examLabel) {
       <tr><td style="font-weight:600;padding:6px 0">Semester</td><td>${e.sem}</td></tr>
       <tr><td style="font-weight:600;padding:6px 0">Exam Type</td><td>${e.type}</td></tr>
       <tr><td style="font-weight:600;padding:6px 0">Control Mode</td><td>${m.label} — ${m.desc}</td></tr>
+      <tr><td style="font-weight:600;padding:6px 0">Exam Dates</td><td>${e.startDate} – ${e.endDate}</td></tr>
+      <tr><td style="font-weight:600;padding:6px 0">Registration Fee</td><td>₹${e.fee || 0}</td></tr>
       <tr><td style="font-weight:600;padding:6px 0">Status</td><td>${e.status}</td></tr>
     </table>
   `;
-  const footer = `<button class="btn" onclick="closeModal()">Close</button><button class="btn btn-primary" onclick="closeModal();${action}"><i class="fas ${info.ctaIcon}"></i> ${info.cta}</button>`;
+  // Only a Pre-Exam-stage exam is safe to delete outright — nothing has
+  // happened against it yet (no attendance, results, fees collected). Once
+  // it's Active or Closed, real downstream data exists elsewhere in the app,
+  // so deleting it here would leave that data orphaned.
+  const deleteBtn = e.status === 'Pre-Exam'
+    ? `<button class="btn btn-danger" style="margin-right:auto" onclick="closeModal();confirmDeleteExam('${e.label}')"><i class="fas fa-trash"></i> Delete Exam</button>`
+    : '';
+  const footer = `${deleteBtn}<button class="btn" onclick="closeModal()">Close</button><button class="btn btn-primary" onclick="closeModal();${action}"><i class="fas ${info.ctaIcon}"></i> ${info.cta}</button>`;
   openModal(e.label, body, footer);
+}
+
+function confirmDeleteExam(examLabel) {
+  const e = recentExams.find(x => x.label === examLabel);
+  if (!e) return;
+  const m = modeInfo[e.mode];
+  const body = `
+    <div class="text-center" style="padding:8px 0 16px">
+      <i class="fas fa-triangle-exclamation" style="font-size:40px;color:var(--danger)"></i>
+      <p class="text-muted" style="margin-top:12px;line-height:1.5">This will permanently remove <strong>${examLabel}</strong> from Recent Exams. It's still in Pre-Exam stage — no attendance, results or fees have been recorded against it — but this action cannot be undone.</p>
+    </div>
+    <table style="width:100%;border-collapse:collapse">
+      <tr><td style="font-weight:600;padding:6px 0;width:140px">Program</td><td>${e.program}</td></tr>
+      <tr><td style="font-weight:600;padding:6px 0">Semester</td><td>${e.sem}</td></tr>
+      <tr><td style="font-weight:600;padding:6px 0">Exam Type</td><td>${e.type}</td></tr>
+      <tr><td style="font-weight:600;padding:6px 0">Control Mode</td><td>${m.label}</td></tr>
+      <tr><td style="font-weight:600;padding:6px 0">Exam Dates</td><td>${e.startDate} – ${e.endDate}</td></tr>
+      <tr><td style="font-weight:600;padding:6px 0">Registration Fee</td><td>₹${e.fee || 0}</td></tr>
+      <tr><td style="font-weight:600;padding:6px 0">Status</td><td><span class="badge badge-warning">${e.status}</span></td></tr>
+    </table>
+  `;
+  const footer = `<button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-danger" onclick="closeModal();deleteExam('${examLabel}')"><i class="fas fa-trash"></i> Delete Permanently</button>`;
+  openModal('Delete Exam', body, footer);
+}
+
+function deleteExam(examLabel) {
+  recentExams = recentExams.filter(x => x.label !== examLabel);
+  const fallbackLabel = recentExams[0] ? recentExams[0].label : null;
+  if (currentExamLabel === examLabel) currentExamLabel = fallbackLabel;
+  // Reports & Analytics keeps its own selected-exam state and cache —
+  // only touch them if that module is actually loaded on this page.
+  if (typeof selectedReportsExam !== 'undefined' && selectedReportsExam === examLabel) {
+    selectedReportsExam = fallbackLabel;
+  }
+  if (typeof reportsExamsCache !== 'undefined') delete reportsExamsCache[examLabel];
+  showPage('exam-creation');
+  showToast(examLabel + ' deleted');
 }
 
 function renderExamCreation() {
@@ -121,7 +193,7 @@ function renderExamCreation() {
     const modeBadgeClass = e.mode === 'affiliated' ? 'badge-neutral' : 'badge-info';
     const actionLabel = e.status === 'Closed' ? 'View' : 'Open';
     const action = `<button class="btn btn-sm" onclick="openExamModal('${e.label}')">${actionLabel}</button>`;
-    return `<tr><td>${e.label}</td><td>${e.program}</td><td>${e.sem}</td><td>${e.type}</td><td><span class="badge ${modeBadgeClass}">${m.label}</span></td><td><span class="badge ${statusBadgeClass[e.status]}">${e.status}</span></td><td>${action}</td></tr>`;
+    return `<tr><td>${e.label}</td><td>${e.program}</td><td>${e.sem}</td><td>${e.type}</td><td><span class="badge ${modeBadgeClass}">${m.label}</span></td><td>${e.startDate}</td><td>${e.endDate}</td><td><span class="badge ${statusBadgeClass[e.status]}">${e.status}</span></td><td>${action}</td></tr>`;
   }).join('');
   return `
     <div class="page-content">
@@ -141,6 +213,13 @@ function renderExamCreation() {
             <div class="form-group"><label>Regulation</label><select class="form-control" id="examCreateRegulation">${regulationOptions}</select></div>
             <div class="form-group"><label>Exam Type</label><select class="form-control" id="examCreateType">${examTypeOptions}</select></div>
           </div>
+          <div class="form-row">
+            <div class="form-group"><label>Start Date</label><input type="date" class="form-control" id="examCreateStartDate"></div>
+            <div class="form-group"><label>End Date</label><input type="date" class="form-control" id="examCreateEndDate"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Registration Fee (₹)</label><input type="number" class="form-control" id="examCreateFee" min="0" step="50" placeholder="e.g. 500" value="500"></div>
+          </div>
           <div class="form-group"><label>Exam Control Mode</label></div>
           <div class="mode-selector">
             <div class="mode-card ${currentMode==='autonomous'?'selected':''}" onclick="selectMode(this,'autonomous')"><i class="fas fa-university"></i><h4>Autonomous</h4><p>Full exam cycle managed by college</p></div>
@@ -159,7 +238,7 @@ function renderExamCreation() {
         <div class="card-body">
           <div class="table-wrap">
             <table>
-              <tr><th>Exam</th><th>Program</th><th>Sem</th><th>Type</th><th>Mode</th><th>Status</th><th></th></tr>
+              <tr><th>Exam</th><th>Program</th><th>Sem</th><th>Type</th><th>Mode</th><th>Start Date</th><th>End Date</th><th>Status</th><th></th></tr>
               ${examRows}
             </table>
           </div>
@@ -381,8 +460,14 @@ const registrationSubjects = {
 // 3.3's "Check Fee Status" gate before approval.
 let registrationApprovals = {};
 
-function registrationKey(studentId) {
-  return currentExamLabel + '|' + studentId;
+// Per-exam fee payment status, keyed the same way as registrationApprovals.
+// Defaults to the student's base feeStatus (from data.js) until they pay the
+// registration fee for *this* exam, so paying is an explicit action tied to
+// the exam's own fee (set on Exam Creation) rather than a global flag.
+let registrationFeePayments = {};
+
+function registrationKey(studentId, examLabel) {
+  return (examLabel || currentExamLabel) + '|' + studentId;
 }
 
 // Registration eligibility is narrower than Eligibility-page eligibility: a
@@ -398,9 +483,15 @@ function isRegistrationEligible(s) {
   return blockingReasons.length === 0;
 }
 
-function getRegistrationRoster() {
-  const eligible = getEligibilityExamConfig().students.filter(isRegistrationEligible);
-  const cfg = registrationSubjects[currentExamLabel] || registrationSubjects['Sem IV Regular Apr 2026'];
+// Optional examLabel lets callers build another exam's roster without
+// disturbing the globally "open" exam (e.g. a student's Hall Ticket history
+// across every exam they've ever registered for, regardless of which exam
+// is currently selected elsewhere in the app).
+function getRegistrationRoster(examLabel) {
+  examLabel = examLabel || currentExamLabel;
+  const examConfig = eligibilityExams[examLabel] || eligibilityExams['Sem IV Regular Apr 2026'];
+  const eligible = examConfig.students.filter(isRegistrationEligible);
+  const cfg = registrationSubjects[examLabel] || registrationSubjects['Sem IV Regular Apr 2026'];
   return eligible.map(s => {
     let subjects, backlog;
     if (cfg.perStudentBacklog) {
@@ -411,12 +502,23 @@ function getRegistrationRoster() {
       subjects = override ? override.subjects : cfg.default;
       backlog = !!(override && override.backlog);
     }
-    const key = registrationKey(s.id);
+    const key = registrationKey(s.id, examLabel);
+    const feeStatus = Object.prototype.hasOwnProperty.call(registrationFeePayments, key)
+      ? registrationFeePayments[key]
+      : s.feeStatus;
     const approval = Object.prototype.hasOwnProperty.call(registrationApprovals, key)
       ? registrationApprovals[key]
-      : (s.feeStatus === 'Paid' ? 'Approved' : 'Pending');
-    return { id: s.id, name: s.name, subjects, backlog, feeStatus: s.feeStatus, approval };
+      : (feeStatus === 'Paid' ? 'Approved' : 'Pending');
+    return { id: s.id, name: s.name, program: s.program, sem: s.sem, subjects, backlog, feeStatus, approval };
   });
+}
+
+function payRegistrationFee(studentId) {
+  const r = getRegistrationRoster().find(x => x.id === studentId);
+  if (!r) return;
+  registrationFeePayments[registrationKey(studentId)] = 'Paid';
+  showPage('registration');
+  showToast(`${r.name} paid the registration fee (₹${getCurrentExamFee()}) for ${currentExamLabel}`);
 }
 
 function changeRegistrationExam(value) {
@@ -432,21 +534,46 @@ function approveOneRegistration(studentId) {
   showToast('Registration approved for ' + r.name);
 }
 
+function rejectRegistration(studentId) {
+  const r = getRegistrationRoster().find(x => x.id === studentId);
+  if (!r) return;
+  showActionModal('Reject Registration', `Reject ${r.name}'s registration for ${currentExamLabel}? They will not be issued a hall ticket unless this is reversed.`, {
+    icon: 'fa-user-times', iconColor: 'var(--danger)', confirmLabel: 'Reject', confirmClass: 'btn-danger', confirmIcon: 'fa-user-times',
+    onConfirm: function () {
+      registrationApprovals[registrationKey(studentId)] = 'Rejected';
+      showPage('registration');
+      showToast('Registration rejected for ' + r.name);
+    }
+  });
+}
+
 function viewRegistrationStudent(studentId) {
   const r = getRegistrationRoster().find(x => x.id === studentId);
   if (!r) return;
-  const subjectText = `${r.subjects.length} subject(s) registered${r.backlog ? ' (backlog)' : ''}: ${r.subjects.join(', ')}.`;
-  const feeText = r.feeStatus === 'Paid' ? 'Fee paid.' : 'Fee payment is pending.';
-  const approvalText = r.approval === 'Approved' ? 'Registration approved.' : r.approval === 'Rejected' ? 'Registration rejected.' : 'Registration approval is on hold.';
-  const isPending = r.approval === 'Pending';
-  showActionModal(`${r.name} (${r.id})`, `${subjectText} ${feeText} ${approvalText}`, {
-    icon: r.approval === 'Approved' ? 'fa-user-check' : r.approval === 'Rejected' ? 'fa-user-times' : 'fa-user-clock',
-    iconColor: r.approval === 'Approved' ? 'var(--success)' : r.approval === 'Rejected' ? 'var(--danger)' : 'var(--warning)',
-    showCancel: isPending,
-    confirmLabel: isPending ? 'Approve Anyway' : 'OK',
-    confirmIcon: isPending ? 'fa-check' : null,
-    onConfirm: isPending ? function () { approveOneRegistration(studentId); } : undefined,
-  });
+  const canApprove = r.approval !== 'Approved';
+  const canReject = r.approval !== 'Rejected';
+  const feeBadge = r.feeStatus === 'Paid' ? 'badge-success' : 'badge-warning';
+  const approvalBadgeClass = { Approved: 'badge-success', Pending: 'badge-warning', Rejected: 'badge-danger' }[r.approval];
+  const icon = r.approval === 'Approved' ? 'fa-user-check' : r.approval === 'Rejected' ? 'fa-user-times' : 'fa-user-clock';
+  const iconColor = r.approval === 'Approved' ? 'var(--success)' : r.approval === 'Rejected' ? 'var(--danger)' : 'var(--warning)';
+  const body = `
+    <div class="text-center" style="padding:8px 0 16px">
+      <i class="fas ${icon}" style="font-size:40px;color:${iconColor}"></i>
+    </div>
+    <table style="width:100%;border-collapse:collapse">
+      <tr><td style="font-weight:600;padding:6px 0;width:160px">Student ID</td><td>${r.id}</td></tr>
+      <tr><td style="font-weight:600;padding:6px 0">Name</td><td>${r.name}</td></tr>
+      <tr><td style="font-weight:600;padding:6px 0">Program</td><td>${r.program}</td></tr>
+      <tr><td style="font-weight:600;padding:6px 0">Semester</td><td>${r.sem}</td></tr>
+      <tr><td style="font-weight:600;padding:6px 0">Exam</td><td>${currentExamLabel}</td></tr>
+      <tr><td style="font-weight:600;padding:6px 0">Subjects Registered</td><td>${r.subjects.join(', ')}${r.backlog ? ' (Backlog)' : ''}</td></tr>
+      <tr><td style="font-weight:600;padding:6px 0">Registration Fee</td><td>₹${getCurrentExamFee()}</td></tr>
+      <tr><td style="font-weight:600;padding:6px 0">Fee Status</td><td><span class="badge ${feeBadge}">${r.feeStatus}</span></td></tr>
+      <tr><td style="font-weight:600;padding:6px 0">Approval</td><td><span class="badge ${approvalBadgeClass}">${r.approval}</span></td></tr>
+    </table>
+  `;
+  const footer = `<button class="btn" onclick="closeModal()">Close</button>${canReject ? `<button class="btn btn-danger" onclick="closeModal();rejectRegistration('${r.id}')"><i class="fas fa-user-times"></i> Reject</button>` : ''}${canApprove ? `<button class="btn btn-primary" onclick="closeModal();approveOneRegistration('${r.id}')"><i class="fas fa-check"></i> ${r.approval === 'Rejected' ? 'Approve' : 'Approve Anyway'}</button>` : ''}`;
+  openModal(`${r.name} (${r.id})`, body, footer);
 }
 
 function finalApproveAllRegistrations() {
@@ -530,6 +657,7 @@ function renderRegistration() {
       : 'Hybrid mode: Approve internal/practical subjects in ERP; export external subjects to the university.';
   const roster = getRegistrationRoster();
   const approvedCount = roster.filter(r => r.approval === 'Approved').length;
+  const examFee = getCurrentExamFee();
   const examOptions = Object.keys(eligibilityExams).map(key =>
     `<option value="${key}" ${key === currentExamLabel ? 'selected' : ''}>${key}</option>`
   ).join('');
@@ -542,7 +670,10 @@ function renderRegistration() {
   const approvalBadge = { Approved: 'badge-success', Pending: 'badge-warning', Rejected: 'badge-danger' };
   const rows = roster.map(r => {
     const subjectText = `${r.subjects.join(', ')}${r.backlog ? ' (Backlog)' : ''}`;
-    return `<tr><td>${r.name} (${r.id})</td><td>${subjectText}</td><td><span class="badge ${r.feeStatus === 'Paid' ? 'badge-success' : 'badge-warning'}">${r.feeStatus}</span></td><td><span class="badge ${approvalBadge[r.approval]}">${r.approval}</span></td><td><button class="btn btn-sm btn-primary" onclick="viewRegistrationStudent('${r.id}')">View</button></td></tr>`;
+    const payFeeBtn = r.feeStatus !== 'Paid'
+      ? `<button class="btn btn-sm btn-success" onclick="payRegistrationFee('${r.id}')"><i class="fas fa-rupee-sign"></i> Pay Fee</button>`
+      : '';
+    return `<tr><td>${r.name} (${r.id})</td><td>${subjectText}</td><td><span class="badge ${r.feeStatus === 'Paid' ? 'badge-success' : 'badge-warning'}">${r.feeStatus}</span></td><td><span class="badge ${approvalBadge[r.approval]}">${r.approval}</span></td><td><div class="flex gap-2">${payFeeBtn}<button class="btn btn-sm btn-primary" onclick="viewRegistrationStudent('${r.id}')">View</button></div></td></tr>`;
   }).join('');
   return `
     <div class="page-content">
@@ -551,6 +682,7 @@ function renderRegistration() {
         <select class="form-control" onchange="changeRegistrationExam(this.value)">${examOptions}</select>
         <span class="chip"><i class="fas fa-users"></i> ${roster.length} Registered</span>
         <span class="chip"><i class="fas fa-check-circle" style="color:#059669"></i> ${approvedCount} Approved</span>
+        <span class="chip"><i class="fas fa-rupee-sign"></i> Fee: ₹${examFee}</span>
         <div class="flex gap-2" style="margin-left:auto">${filterActions}</div>
       </div>
       <div class="card">
@@ -571,6 +703,144 @@ function renderRegistration() {
 // ============================================================
 // TIMETABLE
 // ============================================================
+// Each exam gets its own timetable and subject list, so switching the exam
+// selector shows genuinely different scheduled subjects instead of Sem IV's
+// CS401-CS406 slots regardless of which exam is selected. Sem IV keeps using
+// the original `data.timetableSlots` array (same reference) since Seating,
+// Invigilator and Hall Ticket already read from it directly.
+const examTimetables = {
+  'Sem IV Regular Apr 2026': data.timetableSlots,
+  'Sem VI Regular Apr 2026': [
+    { date: '08 Apr 2026', session: 'Morning', subject: 'Machine Learning', code: 'CS601', time: '10:00 - 13:00', duration: '3 hrs' },
+    { date: '10 Apr 2026', session: 'Morning', subject: 'Cloud Computing', code: 'CS602', time: '10:00 - 13:00', duration: '3 hrs' },
+    { date: '12 Apr 2026', session: 'Morning', subject: 'Big Data Analytics', code: 'CS603', time: '10:00 - 12:00', duration: '2 hrs' },
+    { date: '14 Apr 2026', session: 'Morning', subject: 'Internet of Things', code: 'CS604', time: '10:00 - 12:00', duration: '2 hrs' },
+    { date: '16 Apr 2026', session: 'Morning', subject: 'Deep Learning', code: 'CS605', time: '10:00 - 12:00', duration: '2 hrs' },
+    { date: '18 Apr 2026', session: 'Morning', subject: 'Blockchain Technology', code: 'CS606', time: '10:00 - 13:00', duration: '3 hrs' },
+  ],
+  'Sem II Supplementary Jan 2026': [
+    { date: '12 Jan 2026', session: 'Morning', subject: 'Mathematics I', code: 'SUP101', time: '10:00 - 13:00', duration: '3 hrs' },
+    { date: '14 Jan 2026', session: 'Morning', subject: 'Physics', code: 'SUP102', time: '10:00 - 12:00', duration: '2 hrs' },
+    { date: '16 Jan 2026', session: 'Morning', subject: 'Chemistry', code: 'SUP103', time: '10:00 - 12:00', duration: '2 hrs' },
+    { date: '18 Jan 2026', session: 'Afternoon', subject: 'English', code: 'SUP104', time: '14:00 - 16:00', duration: '2 hrs' },
+  ],
+};
+
+// Subjects offered when adding a slot, matched to the exam being scheduled —
+// falls back to the Sem IV master subject catalog (data.subjects) for any
+// exam without its own list.
+const examSubjectCatalog = {
+  'Sem VI Regular Apr 2026': [
+    { code: 'CS601', name: 'Machine Learning' },
+    { code: 'CS602', name: 'Cloud Computing' },
+    { code: 'CS603', name: 'Big Data Analytics' },
+    { code: 'CS604', name: 'Internet of Things' },
+    { code: 'CS605', name: 'Deep Learning' },
+    { code: 'CS606', name: 'Blockchain Technology' },
+  ],
+  'Sem II Supplementary Jan 2026': [
+    { code: 'SUP101', name: 'Mathematics I' },
+    { code: 'SUP102', name: 'Physics' },
+    { code: 'SUP103', name: 'Chemistry' },
+    { code: 'SUP104', name: 'English' },
+  ],
+};
+
+function getExamTimetableSlots(examLabel) {
+  if (!examTimetables[examLabel]) examTimetables[examLabel] = [];
+  return examTimetables[examLabel];
+}
+
+function getExamSubjects(examLabel) {
+  return examSubjectCatalog[examLabel] || data.subjects;
+}
+
+function changeTimetableExam(value) {
+  openExam(value);
+  showPage('timetable');
+}
+
+const TIMETABLE_MONTHS = { Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5, Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11 };
+// Slot dates are stored as "DD Mon YYYY" strings (not ISO), so this parses
+// them directly rather than relying on the browser's lenient Date parsing.
+function weekdayOf(displayDate) {
+  const [day, mon, year] = displayDate.split(' ');
+  if (!(mon in TIMETABLE_MONTHS)) return '';
+  return new Date(Number(year), TIMETABLE_MONTHS[mon], Number(day)).toLocaleDateString('en-US', { weekday: 'short' });
+}
+
+const TIMETABLE_SESSION_STYLE = {
+  Morning: { cls: 'badge-warning', icon: 'fa-sun' },
+  Afternoon: { cls: 'badge-info', icon: 'fa-cloud-sun' },
+};
+
+function parseTimetableDate(displayDate) {
+  const [day, mon, year] = displayDate.split(' ');
+  if (!(mon in TIMETABLE_MONTHS)) return null;
+  return new Date(Number(year), TIMETABLE_MONTHS[mon], Number(day));
+}
+
+// "09-20 Nov" (same month) or "28 Mar - 02 Apr" (spanning months) — computed
+// from the actual min/max slot dates rather than assuming array order.
+function formatExamWindow(slots) {
+  const dates = slots.map(s => parseTimetableDate(s.date)).filter(Boolean);
+  if (!dates.length) return '—';
+  const min = new Date(Math.min(...dates));
+  const max = new Date(Math.max(...dates));
+  const d1 = String(min.getDate()).padStart(2, '0');
+  const d2 = String(max.getDate()).padStart(2, '0');
+  const mon1 = min.toLocaleDateString('en-US', { month: 'short' });
+  const mon2 = max.toLocaleDateString('en-US', { month: 'short' });
+  return mon1 === mon2 ? `${d1}-${d2} ${mon2}` : `${d1} ${mon1} - ${d2} ${mon2}`;
+}
+
+// Real, data-driven checks (not canned copy): flags an actual double-booked
+// session, a day that needs more rooms than the ERP has on file, and any
+// slot whose duration falls outside the two credit-based durations this app
+// ever schedules (2 hrs / 3 hrs).
+function getTimetableValidation(slots) {
+  const seenSlot = new Map();
+  let overlap = null;
+  slots.forEach(s => {
+    const key = s.date + '|' + s.session;
+    if (seenSlot.has(key)) overlap = { a: seenSlot.get(key), b: s };
+    else seenSlot.set(key, s);
+  });
+
+  const roomCount = (typeof data !== 'undefined' && data.rooms) ? data.rooms.length : 0;
+  const perDay = {};
+  slots.forEach(s => { perDay[s.date] = (perDay[s.date] || 0) + 1; });
+  const maxPerDay = Math.max(0, ...Object.values(perDay));
+  const roomsOk = roomCount === 0 || maxPerDay <= roomCount;
+
+  const allowedDurations = ['2 hrs', '3 hrs'];
+  const badDuration = slots.find(s => !allowedDurations.includes(s.duration));
+
+  return [
+    {
+      name: 'Subject overlap',
+      detail: overlap
+        ? `${overlap.a.subject} and ${overlap.b.subject} both scheduled ${overlap.a.date} (${overlap.a.session})`
+        : 'No student has two papers in the same session',
+      status: overlap ? 'Review' : 'Clear',
+    },
+    {
+      name: 'Room availability',
+      detail: roomCount
+        ? `${roomCount} room(s) on file; up to ${maxPerDay} session(s) scheduled on the busiest day`
+        : 'No room data available to check against',
+      status: roomsOk ? 'Clear' : 'Review',
+    },
+    {
+      name: 'Duration rules',
+      detail: badDuration
+        ? `${badDuration.subject} duration (${badDuration.duration}) is outside the credit-based 2-3 hr range`
+        : 'Credit-based duration matches regulation (2-3 hrs)',
+      status: badDuration ? 'Review' : 'Clear',
+    },
+  ];
+}
+
 function renderTimetable() {
   const isAffiliated = currentMode === 'affiliated';
   const modeAlert = isAffiliated
@@ -578,46 +848,127 @@ function renderTimetable() {
     : currentMode === 'hybrid'
       ? 'Hybrid: Create internal/practical timetable in ERP; import the university timetable for external subjects.'
       : 'Autonomous: Create the timetable directly in ERP and validate conflicts before publishing.';
+  const slots = getExamTimetableSlots(currentExamLabel);
+  const publishedCount = slots.filter(s => s.published !== false).length;
+  const checks = getTimetableValidation(slots);
+  const reviewChecks = checks.filter(c => c.status === 'Review');
+  const examWindow = formatExamWindow(slots);
+  const uniqueSessions = [...new Set(slots.map(s => s.session))];
+  const sessionsSummary = slots.length
+    ? `${uniqueSessions.join('/') || 'No'} session(s) for ${slots.length} theory paper${slots.length === 1 ? '' : 's'}`
+    : 'No sessions scheduled yet';
+  const flagsSummary = reviewChecks.length
+    ? `${reviewChecks.map(c => c.name).join(', ')} — review before final publish`
+    : 'All checks clear — ready to publish';
+  const examOptions = Object.keys(eligibilityExams).map(key =>
+    `<option value="${key}" ${key === currentExamLabel ? 'selected' : ''}>${key}</option>`
+  ).join('');
   const createActions = !isAffiliated
-    ? `<button class="btn btn-primary btn-sm" onclick="openAddSlotModal()"><i class="fas fa-plus"></i> Add Slot</button><button class="btn btn-sm" onclick="showActionModal('Validate Conflicts','Checked all ${data.timetableSlots.length} scheduled subjects for date, room and invigilator conflicts — no conflicts found.', {icon:'fa-check-circle', iconColor:'var(--success)', showCancel:false, confirmLabel:'OK'})"><i class="fas fa-check"></i> Validate Conflicts</button>`
+    ? `<button class="btn btn-primary btn-sm" onclick="openAddSlotModal()"><i class="fas fa-plus"></i> Add Slot</button><button class="btn btn-sm" onclick="validateTimetableConflicts()"><i class="fas fa-check"></i> Validate Conflicts</button>`
     : '';
   const importAction = currentMode !== 'autonomous'
     ? `<button class="btn ${isAffiliated?'btn-primary':''} btn-sm" onclick="showActionModal('Import University Timetable','Select the university-released timetable file to import exam dates and sessions.', {icon:'fa-file-import', confirmLabel:'Choose File', confirmIcon:'fa-upload'})"><i class="fas fa-file-import"></i> Import University Timetable</button>`
     : '';
-  const rows = data.timetableSlots.map(s => `<tr><td>${s.date}</td><td>${s.session}</td><td>${s.subject}</td><td>${s.code}</td><td>${s.time}</td><td>${s.duration}</td><td><span class="badge ${s.published===false?'badge-warning':'badge-success'}">${s.published===false?'Scheduled':'Published'}</span></td></tr>`).join('');
+  const rows = slots.map(s => {
+    const isPublished = s.published !== false;
+    const session = TIMETABLE_SESSION_STYLE[s.session] || { cls: 'badge-neutral', icon: 'fa-clock' };
+    return `<tr>
+      <td style="border-left:3px solid ${isPublished ? 'var(--success)' : 'var(--warning)'};white-space:nowrap">
+        <div style="font-weight:600">${s.date}</div>
+        <div class="text-muted" style="font-size:11px">${weekdayOf(s.date)}</div>
+      </td>
+      <td><span class="badge ${session.cls}"><i class="fas ${session.icon}"></i> ${s.session}</span></td>
+      <td>
+        <div style="font-weight:600">${s.subject}</div>
+        <div class="text-muted" style="font-size:11px;font-family:monospace">${s.code}</div>
+      </td>
+      <td><span class="badge badge-neutral"><i class="fas fa-clock"></i> ${s.time}</span></td>
+      <td><span class="text-muted"><i class="fas fa-stopwatch"></i> ${s.duration}</span></td>
+      <td><span class="badge ${isPublished ? 'badge-success' : 'badge-warning'}"><i class="fas ${isPublished ? 'fa-check-circle' : 'fa-hourglass-half'}"></i> ${isPublished ? 'Published' : 'Scheduled'}</span></td>
+    </tr>`;
+  }).join('');
+  const checkRows = checks.map(c => `
+    <div class="check-row">
+      <div>
+        <div class="check-name">${c.name}</div>
+        <div class="check-detail">${c.detail}</div>
+      </div>
+      <span class="badge ${c.status === 'Clear' ? 'badge-success' : 'badge-warning'}">${c.status}</span>
+    </div>
+  `).join('');
   return `
     <div class="page-content">
       <div class="alert alert-info"><i class="fas fa-info-circle"></i> ${modeAlert}</div>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <i class="fas fa-calendar-check icon"></i>
+          <div class="label">Published Slots</div>
+          <div class="value">${publishedCount}/${slots.length}</div>
+          <div class="sub">Published slots drive hall ticket and seating outputs</div>
+        </div>
+        <div class="stat-card">
+          <i class="fas fa-clock icon"></i>
+          <div class="label">Exam Window</div>
+          <div class="value" style="font-size:22px">${examWindow}</div>
+          <div class="sub">${sessionsSummary}</div>
+        </div>
+        <div class="stat-card ${reviewChecks.length ? 'stat-warning' : ''}">
+          <i class="fas fa-triangle-exclamation icon"></i>
+          <div class="label">Review Flags</div>
+          <div class="value">${reviewChecks.length}</div>
+          <div class="sub">${flagsSummary}</div>
+        </div>
+      </div>
       <div class="filter-bar">
-        <select class="form-control"><option>${currentExamLabel}</option></select>
+        <select class="form-control" onchange="changeTimetableExam(this.value)">${examOptions}</select>
         ${createActions}
         ${importAction}
         <button class="btn btn-success btn-sm" style="margin-left:auto" onclick="publishTimetable()"><i class="fas fa-check"></i> Publish Timetable</button>
       </div>
       <div class="card">
-        <div class="card-header"><h3><i class="fas fa-calendar-alt"></i> Exam Timetable</h3><span class="text-muted">${data.timetableSlots.length} subject(s) scheduled</span></div>
+        <div class="card-header"><h3><i class="fas fa-calendar-alt"></i> Exam Timetable</h3><span class="text-muted">${slots.length} subject(s) scheduled</span></div>
         <div class="card-body">
           <div class="table-wrap">
             <table>
-              <tr><th>Date</th><th>Session</th><th>Subject</th><th>Code</th><th>Time</th><th>Duration</th><th>Status</th></tr>
-              ${rows}
+              <tr><th>Date</th><th>Session</th><th>Subject</th><th>Time</th><th>Duration</th><th>Status</th></tr>
+              ${rows || '<tr><td colspan="6" class="text-center text-muted" style="padding:20px">No slots scheduled yet for this exam.</td></tr>'}
             </table>
           </div>
         </div>
+      </div>
+      <div class="card mt-4">
+        <div class="card-header"><h3><i class="fas fa-shield-halved"></i> Validation Checks</h3></div>
+        <div class="card-body">${checkRows}</div>
       </div>
     </div>
   `;
 }
 
+function validateTimetableConflicts() {
+  const slots = getExamTimetableSlots(currentExamLabel);
+  const checks = getTimetableValidation(slots);
+  const failed = checks.filter(c => c.status === 'Review');
+  if (failed.length === 0) {
+    showActionModal('Validate Conflicts', `Checked all ${slots.length} scheduled subjects for date, room and duration conflicts — no conflicts found.`, {
+      icon: 'fa-check-circle', iconColor: 'var(--success)', showCancel: false, confirmLabel: 'OK',
+    });
+  } else {
+    showActionModal('Conflicts Found', failed.map(c => `${c.name}: ${c.detail}`).join(' '), {
+      icon: 'fa-triangle-exclamation', iconColor: 'var(--warning)', showCancel: false, confirmLabel: 'OK',
+    });
+  }
+}
+
 // ============================================================
 // HALL TICKET
 // ============================================================
-function downloadHallTicket(studentId) {
-  const s = data.students.find(st => st.id === studentId);
+function downloadHallTicket(studentId, examLabel) {
+  examLabel = examLabel || currentExamLabel;
+  const s = getRegistrationRoster(examLabel).find(st => st.id === studentId);
   if (!s) return;
   const hallTicketNo = 'HT-' + studentId;
   const m = modeInfo[currentMode];
-  const subjectRows = data.timetableSlots.map(slot =>
+  const subjectRows = getExamTimetableSlots(examLabel).map(slot =>
     `<tr><td>${slot.code}</td><td>${slot.subject}</td><td>${slot.date}</td><td>${slot.session}</td><td>${slot.time}</td></tr>`
   ).join('');
   const content = `
@@ -659,7 +1010,7 @@ function downloadHallTicket(studentId) {
     <tr><td style="font-weight:600">Student ID</td><td>${s.id}</td></tr>
     <tr><td style="font-weight:600">Program</td><td>${s.program}</td></tr>
     <tr><td style="font-weight:600">Semester</td><td>${s.sem}</td></tr>
-    <tr><td style="font-weight:600">Exam</td><td>${currentExamLabel}</td></tr>
+    <tr><td style="font-weight:600">Exam</td><td>${examLabel}</td></tr>
   </table>
   <div style="display:flex;flex-direction:column;gap:12px">
     <div class="photo-box">Photo</div>
@@ -699,36 +1050,75 @@ function downloadHallTicket(studentId) {
   showToast('Hall ticket downloaded for ' + s.name);
 }
 
+function changeHallTicketExam(value) {
+  openExam(value);
+  showPage('hallticket');
+}
+
 function renderHallTicket() {
-  const rows = data.students.slice(0,6).map(s => `<tr><td>${s.id}</td><td>${s.name}</td><td>HT-${s.id}</td><td>${s.program}</td><td><span class="badge badge-success">Generated</span></td><td><button class="btn btn-sm" onclick="downloadHallTicket('${s.id}')"><i class="fas fa-download"></i> PDF</button></td></tr>`).join('');
+  const roster = getRegistrationRoster();
+  // A logged-in student must only ever see their own hall ticket, never the
+  // whole class roster — this page is shared with the Exam Branch view. The
+  // student's table also isn't limited to whichever exam happens to be
+  // selected in the dropdown: it lists every exam they've ever registered
+  // for (their hall ticket history), so switching the selector to an exam
+  // they're not part of doesn't hide tickets they already have elsewhere.
+  const isStudent = typeof loggedInUser !== 'undefined' && loggedInUser && loggedInUser.role === 'student';
+  const myTickets = isStudent
+    ? Object.keys(eligibilityExams)
+        .map(examLabel => ({ examLabel, s: getRegistrationRoster(examLabel).find(x => x.id === CURRENT_STUDENT_ID) }))
+        .filter(x => x.s)
+    : [];
+  // Past, already-completed semesters (defined in post-exam.js alongside
+  // studentSemData) round out the history with earlier exams, since this
+  // student is only ever "live-registered" for the one current exam above.
+  const pastTickets = isStudent && typeof studentPastHallTickets !== 'undefined' ? studentPastHallTickets : [];
+  const liveRows = isStudent
+    ? myTickets.map(({ examLabel, s }) => `<tr><td>${s.id}</td><td>${s.name}</td><td>HT-${s.id}</td><td>${s.program}</td><td>${examLabel}</td><td><span class="badge badge-success">Generated</span></td><td><button class="btn btn-sm" onclick="downloadHallTicket('${s.id}','${examLabel}')"><i class="fas fa-download"></i> PDF</button></td></tr>`).join('')
+    : roster.map(s => `<tr><td>${s.id}</td><td>${s.name}</td><td>HT-${s.id}</td><td>${s.program}</td><td><span class="badge badge-success">Generated</span></td><td><button class="btn btn-sm" onclick="downloadHallTicket('${s.id}')"><i class="fas fa-download"></i> PDF</button></td></tr>`).join('');
+  const pastRows = pastTickets.map(t => `<tr><td>${CURRENT_STUDENT_ID}</td><td>Aarav Sharma</td><td>${t.hallTicketNo}</td><td>B.E. Computer</td><td>${t.examLabel}</td><td><span class="badge badge-neutral">Closed</span></td><td><button class="btn btn-sm" onclick="downloadPastHallTicket('${t.examLabel}')"><i class="fas fa-download"></i> PDF</button></td></tr>`).join('');
+  const rows = liveRows + pastRows;
+  const visibleCount = isStudent ? myTickets.length + pastTickets.length : roster.length;
   const isAffiliated = currentMode === 'affiliated';
   const modeAlert = isAffiliated
     ? 'Affiliated: Import university hall ticket numbers or PDFs and map them to students.'
     : currentMode === 'hybrid'
       ? 'Hybrid: Generate hall tickets in ERP for internal subjects; import university hall ticket data for external subjects.'
       : 'Autonomous: Generate hall ticket numbers and PDFs directly in ERP. Supports QR/barcode.';
-  const generateBtn = !isAffiliated
-    ? `<button class="btn btn-primary btn-sm" onclick="showActionModal('Generate All Hall Tickets','Generate hall tickets for all 248 registered students? This will create hall ticket numbers and PDFs.', {icon:'fa-magic', confirmLabel:'Generate All', confirmIcon:'fa-check'})"><i class="fas fa-magic"></i> Generate All</button>`
+  // The exam selector doesn't affect the student's table at all (it always
+  // lists every exam they've registered for, live or past), so it's only
+  // shown for the Exam Branch view, where it still filters the roster.
+  const examSelector = !isStudent
+    ? `<select class="form-control" onchange="changeHallTicketExam(this.value)">${Object.keys(eligibilityExams).map(key =>
+        `<option value="${key}" ${key === currentExamLabel ? 'selected' : ''}>${key}</option>`
+      ).join('')}</select>`
     : '';
-  const importBtn = currentMode !== 'autonomous'
+  const generateBtn = !isAffiliated && !isStudent
+    ? `<button class="btn btn-primary btn-sm" onclick="showActionModal('Generate All Hall Tickets','Generate hall tickets for all ${roster.length} registered students of ${currentExamLabel}? This will create hall ticket numbers and PDFs.', {icon:'fa-magic', confirmLabel:'Generate All', confirmIcon:'fa-check'})"><i class="fas fa-magic"></i> Generate All</button>`
+    : '';
+  const importBtn = currentMode !== 'autonomous' && !isStudent
     ? `<button class="btn ${isAffiliated?'btn-primary':''} btn-sm" onclick="showActionModal('Import University Hall Tickets','Select the university-provided hall ticket file (PDFs or numbers) to import and map to students.', {icon:'fa-upload', confirmLabel:'Choose File', confirmIcon:'fa-upload'})"><i class="fas fa-upload"></i> Import University Hall Tickets</button>`
+    : '';
+  const publishBtn = !isStudent
+    ? `<button class="btn btn-sm" style="margin-left:auto" onclick="showActionModal('Publish to Portal','Hall tickets for all ${roster.length} students of ${currentExamLabel} are now published and downloadable from the student portal.', {icon:'fa-check-circle', iconColor:'var(--success)', showCancel:false, confirmLabel:'OK'})"><i class="fas fa-check"></i> Publish to Portal</button>`
     : '';
   return `
     <div class="page-content">
-      <div class="alert alert-info"><i class="fas fa-info-circle"></i> ${modeAlert}</div>
+      <div class="alert alert-info"><i class="fas fa-info-circle"></i> ${isStudent ? 'Download your hall ticket(s) below — every exam you have registered for, past and present. Carry it along with a valid photo ID to every exam session.' : modeAlert}</div>
+      ${isStudent ? '' : `
       <div class="filter-bar">
-        <select class="form-control"><option>${currentExamLabel}</option></select>
+        ${examSelector}
         ${generateBtn}
         ${importBtn}
-        <button class="btn btn-sm" style="margin-left:auto" onclick="showActionModal('Publish to Portal','Hall tickets for all 248 students are now published and downloadable from the student portal.', {icon:'fa-check-circle', iconColor:'var(--success)', showCancel:false, confirmLabel:'OK'})"><i class="fas fa-check"></i> Publish to Portal</button>
-      </div>
+        ${publishBtn}
+      </div>`}
       <div class="card">
-        <div class="card-header"><h3><i class="fas fa-ticket-alt"></i> Hall Tickets</h3><span class="text-muted">Total: 248</span></div>
+        <div class="card-header"><h3><i class="fas fa-ticket-alt"></i> ${isStudent ? 'My Hall Tickets' : 'Hall Tickets'}</h3><span class="text-muted">Total: ${visibleCount}</span></div>
         <div class="card-body">
           <div class="table-wrap">
             <table>
-              <tr><th>Student ID</th><th>Name</th><th>Hall Ticket No.</th><th>Program</th><th>Status</th><th></th></tr>
-              ${rows}
+              <tr><th>Student ID</th><th>Name</th><th>Hall Ticket No.</th><th>Program</th>${isStudent ? '<th>Exam</th>' : ''}<th>Status</th><th></th></tr>
+              ${rows || `<tr><td colspan="${isStudent ? 7 : 6}" class="text-center text-muted" style="padding:20px">${isStudent ? 'No hall tickets found for your account yet.' : 'No registered students for this exam yet.'}</td></tr>`}
             </table>
           </div>
         </div>
@@ -941,23 +1331,60 @@ function renderInvigilator() {
   const assignments = getInvigilatorAssignments(idx);
   const slotOptions = slots.map((s, i) => `<option value="${i}" ${i === idx ? 'selected' : ''}>${s.date} - ${s.session}</option>`).join('');
   const statusClass = { Confirmed: 'badge-success', Pending: 'badge-warning', 'Not Assigned': 'badge-danger' };
+
+  // The Invigilator login is one shared generic account, not tied to a
+  // specific faculty record, so F01 stands in as "you" here — enough to
+  // demonstrate the view-only restriction without inventing a real identity
+  // system. Exam Branch / Admin still get the full management view.
+  const isInvigilatorRole = typeof loggedInUser !== 'undefined' && loggedInUser && loggedInUser.role === 'invigilator';
+  const myFacultyId = 'F01';
+
+  const statusAccent = { Confirmed: 'var(--success)', Pending: 'var(--warning)', 'Not Assigned': 'var(--danger)' };
   const rows = assignments.map(a => {
     const faculty = findFaculty(a.facultyId);
-    const action = a.facultyId
-      ? `<button class="btn btn-sm btn-danger" onclick="unassignInvigilator(${idx}, '${a.room}')">Unassign</button>`
-      : `<button class="btn btn-sm btn-primary" onclick="openAssignInvigilatorModal(${idx}, '${a.room}')">Assign</button>`;
-    return `<tr><td>${a.room}</td><td>${slot.subject}</td><td>${faculty ? faculty.name : '—'}</td><td>${faculty ? faculty.id : '—'}</td><td><span class="badge ${statusClass[a.status]}">${a.status}</span></td><td>${action}</td></tr>`;
+    const isMine = isInvigilatorRole && a.facultyId === myFacultyId;
+    const action = isInvigilatorRole
+      ? (isMine ? `<span class="badge badge-info">You</span>` : '')
+      : (a.facultyId
+        ? `<button class="btn btn-sm btn-danger" onclick="unassignInvigilator(${idx}, '${a.room}')">Unassign</button>`
+        : `<button class="btn btn-sm btn-primary" onclick="openAssignInvigilatorModal(${idx}, '${a.room}')">Assign</button>`);
+    const initials = faculty ? faculty.name.replace(/^(Dr\.|Prof\.)\s*/, '').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() : '';
+    const invigilatorCell = faculty
+      ? `<div class="flex-center"><div style="width:28px;height:28px;border-radius:50%;background:var(--primary-light);color:var(--primary);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">${initials}</div><span>${faculty.name}</span></div>`
+      : `<span class="text-muted">— Unassigned —</span>`;
+    const contactCell = faculty
+      ? `<span class="badge badge-neutral"><i class="fas fa-id-badge"></i> ${faculty.id}</span>`
+      : `<span class="text-muted">—</span>`;
+    return `<tr${isMine ? ' style="background:var(--primary-light)"' : ''}>
+      <td style="border-left:3px solid ${statusAccent[a.status]};font-weight:600">${a.room}</td>
+      <td>${slot.subject}</td>
+      <td>${invigilatorCell}</td>
+      <td>${contactCell}</td>
+      <td><span class="badge ${statusClass[a.status]}">${a.status}</span></td>
+      <td>${action}</td>
+    </tr>`;
   }).join('');
   const unassignedCount = assignments.filter(a => !a.facultyId).length;
+  const pendingCount = assignments.filter(a => a.status === 'Pending').length;
+  const confirmedCount = assignments.filter(a => a.status === 'Confirmed').length;
+  const modeAlert = isInvigilatorRole
+    ? 'View-only: this is the published duty chart for your session. Contact the Exam Branch for any reassignment.'
+    : 'Assign faculty members to examination rooms. System checks for conflicts.';
+  const actionButtons = isInvigilatorRole
+    ? ''
+    : `<button class="btn btn-primary btn-sm" onclick="openAssignInvigilatorModal(${idx})" ${unassignedCount ? '' : 'disabled title="All rooms already have an invigilator assigned"'}><i class="fas fa-plus"></i> Assign</button>
+        <button class="btn btn-sm" style="margin-left:auto" onclick="validateInvigilatorConflicts(${idx})"><i class="fas fa-check"></i> Validate Conflicts</button>
+        <button class="btn btn-sm" onclick="publishInvigilatorDutyChart(${idx}, '${slotLabel}')"><i class="fas fa-file-pdf"></i> Publish Duty Chart</button>`;
   return `
     <div class="page-content">
-      <div class="alert alert-info"><i class="fas fa-info-circle"></i> Assign faculty members to examination rooms. System checks for conflicts.</div>
+      <div class="alert alert-info"><i class="fas fa-info-circle"></i> ${modeAlert}</div>
       <div class="filter-bar">
         <select class="form-control" onchange="changeInvigilatorSlot(this.value)">${slotOptions}</select>
         <span class="chip"><i class="fas fa-book"></i> ${slot.subject}</span>
-        <button class="btn btn-primary btn-sm" onclick="openAssignInvigilatorModal(${idx})" ${unassignedCount ? '' : 'disabled title="All rooms already have an invigilator assigned"'}><i class="fas fa-plus"></i> Assign</button>
-        <button class="btn btn-sm" style="margin-left:auto" onclick="validateInvigilatorConflicts(${idx})"><i class="fas fa-check"></i> Validate Conflicts</button>
-        <button class="btn btn-sm" onclick="publishInvigilatorDutyChart(${idx}, '${slotLabel}')"><i class="fas fa-file-pdf"></i> Publish Duty Chart</button>
+        <span class="chip"><i class="fas fa-check-circle" style="color:#059669"></i> ${confirmedCount} Confirmed</span>
+        ${pendingCount ? `<span class="chip"><i class="fas fa-clock" style="color:#d97706"></i> ${pendingCount} Pending</span>` : ''}
+        ${unassignedCount ? `<span class="chip"><i class="fas fa-exclamation-circle" style="color:#dc2626"></i> ${unassignedCount} Unassigned</span>` : ''}
+        ${actionButtons}
       </div>
       <div class="card">
         <div class="card-header"><h3><i class="fas fa-chalkboard-teacher"></i> Invigilator Duty Chart — ${slotLabel}</h3><span class="text-muted">${assignments.length - unassignedCount} / ${assignments.length} rooms assigned</span></div>

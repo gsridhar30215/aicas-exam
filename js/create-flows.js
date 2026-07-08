@@ -7,13 +7,12 @@ function openRecordCaseModal() {
   openFormModal('Record Special Case', `
     <div class="form-group"><label>Student</label>
       <select class="form-control" id="newCaseStudent">
-        <option>Rohit Joshi (S007)</option>
-        <option>Ankit Tiwari (S011)</option>
+        ${data.students.map(s => `<option>${s.name} (${s.id})</option>`).join('')}
       </select>
     </div>
     <div class="form-group"><label>Subject</label>
       <select class="form-control" id="newCaseSubject">
-        <option>DS & Algorithms</option><option>DBMS</option><option>Operating Systems</option><option>Computer Networks</option><option>Software Engineering</option><option>Mathematics IV</option>
+        ${data.subjects.map(s => `<option>${s.name}</option>`).join('')}
       </select>
     </div>
     <div class="form-group"><label>Case Type</label>
@@ -41,6 +40,7 @@ function openRecordCaseModal() {
 }
 
 function openAddSlotModal() {
+  const examSubjects = getExamSubjects(currentExamLabel);
   openFormModal('Add Timetable Slot', `
     <div class="form-row">
       <div class="form-group"><label>Date</label><input type="date" class="form-control" id="newSlotDate" value="2026-04-22"></div>
@@ -50,7 +50,7 @@ function openAddSlotModal() {
     </div>
     <div class="form-group"><label>Subject</label>
       <select class="form-control" id="newSlotSubject">
-        ${data.subjects.map(s => `<option value="${s.code}">${s.name}</option>`).join('')}
+        ${examSubjects.map(s => `<option value="${s.code}">${s.name}</option>`).join('')}
       </select>
     </div>
     <div class="form-row">
@@ -62,10 +62,10 @@ function openAddSlotModal() {
     const date = dateRaw ? new Date(dateRaw + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'TBD';
     const session = document.getElementById('newSlotSession').value;
     const code = document.getElementById('newSlotSubject').value;
-    const subject = data.subjects.find(s => s.code === code)?.name || code;
+    const subject = examSubjects.find(s => s.code === code)?.name || code;
     const time = document.getElementById('newSlotTime').value || 'TBD';
     const duration = document.getElementById('newSlotDuration').value || 'TBD';
-    data.timetableSlots.push({ date, session, subject, code, time, duration, published: false });
+    getExamTimetableSlots(currentExamLabel).push({ date, session, subject, code, time, duration, published: false });
     closeModal();
     showPage('timetable');
     showToast('Slot added for ' + subject);
@@ -73,10 +73,11 @@ function openAddSlotModal() {
 }
 
 function publishTimetable() {
-  showActionModal('Publish Timetable', `${data.timetableSlots.length} subjects scheduled. No conflicts found. Publish the timetable so it becomes visible for hall ticket generation.`, {
+  const slots = getExamTimetableSlots(currentExamLabel);
+  showActionModal('Publish Timetable', `${slots.length} subjects scheduled. No conflicts found. Publish the timetable so it becomes visible for hall ticket generation.`, {
     icon: 'fa-check-circle', iconColor: 'var(--success)', confirmLabel: 'Publish', confirmIcon: 'fa-check',
     onConfirm: function () {
-      data.timetableSlots.forEach(s => { s.published = true; });
+      slots.forEach(s => { s.published = true; });
       showPage('hallticket');
       showToast('Timetable published');
     }
