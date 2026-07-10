@@ -229,6 +229,53 @@
     .hidden { display: none !important; }
     .chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 500; background: #f1f5f9; color: var(--text); border: 1px solid var(--border); }
 
+    /* Seating Plan — Manual Assignment */
+    .seating-toolbar-row { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 16px; flex-wrap: wrap; }
+    .seating-selected-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 14px; font-size: 12px; font-weight: 600; background: #f1f5f9; color: var(--text-muted); border: 1px solid var(--border); transition: var(--transition); }
+    .seating-selected-chip.active { background: var(--primary-light); color: var(--primary-dark); border-color: var(--primary); }
+    .seating-toolbar-row .form-control { max-width: 220px; }
+    .seating-manual-grid { display: grid; grid-template-columns: 300px 1fr; gap: 16px; align-items: start; }
+    .seating-room-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
+    @media (max-width: 900px) { .seating-manual-grid { grid-template-columns: 1fr; } }
+
+    .seat-select-all { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; font-weight: 500; }
+    .seat-unassigned-panel .card-header { flex-wrap: wrap; gap: 8px; }
+    .seat-unassigned-body { max-height: 560px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; border-radius: 8px; transition: var(--transition); }
+    .seat-unassigned-panel.drag-over .seat-unassigned-body { background: var(--primary-light); box-shadow: inset 0 0 0 2px var(--primary); }
+
+    .seat-room { border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); box-shadow: var(--shadow); overflow: hidden; display: flex; flex-direction: column; transition: var(--transition); }
+    .seat-room.drag-over { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
+    .seat-room-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid var(--border); background: linear-gradient(180deg, #fbfcfd, #ffffff); }
+    .seat-room-name { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+    .seat-room-name i { color: var(--primary); font-size: 12px; }
+    .seat-room-count { font-size: 11.5px; font-weight: 700; padding: 2px 9px; border-radius: 10px; background: #f1f5f9; color: var(--text-muted); }
+    .seat-room[data-status="Full"] .seat-room-count { background: #d1fae5; color: #065f46; }
+    .seat-room[data-status="Partial"] .seat-room-count { background: #fef3c7; color: #92400e; }
+    .seat-room-bar { height: 4px; background: #f1f5f9; }
+    .seat-room-bar-fill { height: 100%; background: var(--primary); transition: width .25s ease; }
+    .seat-room[data-status="Full"] .seat-room-bar-fill { background: var(--success); }
+    .seat-room[data-status="Partial"] .seat-room-bar-fill { background: var(--warning); }
+    .seat-room-body { padding: 10px; display: flex; flex-direction: column; gap: 6px; max-height: 230px; overflow-y: auto; flex: 1; min-height: 74px; }
+    .seat-room-empty { text-align: center; padding: 22px 8px; color: var(--text-muted); font-size: 12px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+    /* A room already claimed by a different, simultaneously-running exam —
+       not a drop target, so it's dimmed and its bar/count go neutral. */
+    .seat-room-busy { opacity: .6; }
+    .seat-room-busy .seat-room-count { background: #f1f5f9; color: var(--text-muted); }
+    .seat-room-busy .seat-room-bar-fill { background: var(--text-muted); }
+    .seat-room-empty i { font-size: 18px; opacity: .35; }
+
+    .seat-card { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); font-size: 13px; cursor: grab; transition: var(--transition); }
+    .seat-card:hover { border-color: var(--primary); box-shadow: var(--shadow); }
+    .seat-card:active { cursor: grabbing; opacity: .6; }
+    .seat-card.selected { border-color: var(--primary); background: var(--primary-light); }
+    .seat-drag-handle { color: #cbd5e1; font-size: 11px; }
+    .seat-avatar { width: 26px; height: 26px; border-radius: 50%; background: var(--primary-light); color: var(--primary-dark); display: flex; align-items: center; justify-content: center; font-size: 10.5px; font-weight: 700; flex-shrink: 0; }
+    .seat-info { flex: 1; min-width: 0; }
+    .seat-name { font-weight: 600; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .seat-meta { font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .seat-remove { border: none; background: transparent; color: var(--text-muted); cursor: pointer; padding: 4px 7px; border-radius: 6px; flex-shrink: 0; font-size: 12px; }
+    .seat-remove:hover { background: #fee2e2; color: var(--danger); }
+
     /* Animations */
     @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
     @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }

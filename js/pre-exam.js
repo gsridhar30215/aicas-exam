@@ -15,27 +15,47 @@
 // EXAM CREATION
 // ============================================================
 // Catalog backing the form's dropdowns — several programs (each with their
-// own branch list), academic years, semesters, regulations and exam types,
+// own branch list), academic years, semesters and exam types,
 // so the form has real variety to demo instead of one fixed combination.
 const examCreationCatalog = {
   academicYears: ['2024-25', '2025-26', '2026-27'],
   programs: [
-    { name: 'B.E. Computer Engineering', branches: ['Computer Engineering', 'Information Technology'] },
-    { name: 'B.E. Mechanical Engineering', branches: ['Mechanical Engineering', 'Automobile Engineering'] },
-    { name: 'B.E. Electronics & Telecommunication', branches: ['Electronics & Telecommunication', 'Electronics & Computer Science'] },
-    { name: 'B.E. Civil Engineering', branches: ['Civil Engineering'] },
+    { name: 'B.E. Computer Engineering', code: 'COMP', branches: ['Computer Engineering', 'Information Technology', 'Computer Science & Engineering', 'Artificial Intelligence & Data Science', 'Artificial Intelligence & Machine Learning'] },
+    { name: 'B.E. Mechanical Engineering', code: 'MECH', branches: ['Mechanical Engineering', 'Automobile Engineering', 'Production Engineering', 'Mechatronics Engineering'] },
+    { name: 'B.E. Electronics & Telecommunication', code: 'EXTC', branches: ['Electronics & Telecommunication', 'Electronics & Computer Science', 'Electronics & Instrumentation', 'VLSI Design & Technology'] },
+    { name: 'B.E. Civil Engineering', code: 'CIVIL', branches: ['Civil Engineering', 'Structural Engineering', 'Environmental Engineering'] },
+    { name: 'B.E. Electrical Engineering', code: 'ELEC', branches: ['Electrical Engineering', 'Electrical & Electronics Engineering', 'Instrumentation & Control Engineering'] },
   ],
   semesters: ['Semester I', 'Semester II', 'Semester III', 'Semester IV', 'Semester V', 'Semester VI', 'Semester VII', 'Semester VIII'],
-  regulations: ['R-2020', 'R-2022', 'R-2024'],
-  examTypes: ['Regular', 'Supplementary', 'Re-Exam', 'Backlog'],
+  examTypes: ['Regular Exam', 'Mid-Term Exam', 'Internal Exam', 'External Exam', 'Practical Exam', 'Supplementary Exam', 'Re-Exam', 'Backlog Exam'],
 };
+
+// Looks up a program's catalog code (e.g. 'B.E. Computer' -> 'COMP') from the
+// same catalog backing the Exam Creation Program dropdown, so every table
+// that shows a student/exam's short program name can show its code too
+// without keeping a second hardcoded list in sync.
+function getProgramCode(programShort) {
+  const program = examCreationCatalog.programs.find(p => 'B.E. ' + p.name.replace('B.E. ', '').split(' ')[0] === programShort);
+  return program ? program.code : '';
+}
+
+// Full Program/Sem choice lists for filter dropdowns — drawn from the whole
+// catalog (not just whichever program/sem happens to be in the currently
+// selected exam's roster), so the filter always offers every program and
+// semester the college runs, even on an exam whose roster is all one cohort.
+function getAllProgramShortNames() {
+  return examCreationCatalog.programs.map(p => 'B.E. ' + p.name.replace('B.E. ', '').split(' ')[0]);
+}
+function getAllSemesterCodes() {
+  return examCreationCatalog.semesters.map(s => s.replace('Semester ', ''));
+}
 
 // Mutable — "Create & Activate Exam" unshifts new records here so the Recent
 // Exams table actually grows as exams are created, instead of staying static.
 let recentExams = [
-  { label: 'Sem IV Regular Apr 2026', program: 'B.E. Computer', sem: 'IV', type: 'Regular', mode: 'autonomous', status: 'Active', startDate: '10 Apr 2026', endDate: '20 Apr 2026', fee: 500 },
-  { label: 'Sem VI Regular Apr 2026', program: 'B.E. Computer', sem: 'VI', type: 'Regular', mode: 'autonomous', status: 'Pre-Exam', startDate: '08 Apr 2026', endDate: '22 Apr 2026', fee: 500 },
-  { label: 'Sem II Supplementary Jan 2026', program: 'B.E. Computer', sem: 'II', type: 'Supplementary', mode: 'affiliated', status: 'Closed', startDate: '12 Jan 2026', endDate: '20 Jan 2026', fee: 300 },
+  { label: 'Sem IV Regular Apr 2026', program: 'B.E. Computer', programCode: 'COMP', sem: 'IV', type: 'Regular', mode: 'autonomous', status: 'Active', startDate: '10 Apr 2026', endDate: '20 Apr 2026', fee: 500 },
+  { label: 'Sem VI Regular Apr 2026', program: 'B.E. Computer', programCode: 'COMP', sem: 'VI', type: 'Regular', mode: 'autonomous', status: 'Pre-Exam', startDate: '08 Apr 2026', endDate: '22 Apr 2026', fee: 500 },
+  { label: 'Sem II Supplementary Jan 2026', program: 'B.E. Computer', programCode: 'COMP', sem: 'II', type: 'Supplementary', mode: 'affiliated', status: 'Closed', startDate: '12 Jan 2026', endDate: '20 Jan 2026', fee: 300 },
 ];
 
 function getCurrentExamFee() {
@@ -54,14 +74,15 @@ function updateExamCreateBranches() {
   const programName = document.getElementById('examCreateProgram').value;
   const program = examCreationCatalog.programs.find(p => p.name === programName) || examCreationCatalog.programs[0];
   document.getElementById('examCreateBranch').innerHTML = program.branches.map(b => `<option>${b}</option>`).join('');
+  document.getElementById('examCreateProgramCode').textContent = program.code;
 }
 
 function createExam() {
   const year = document.getElementById('examCreateYear').value;
   const programName = document.getElementById('examCreateProgram').value;
+  const programCode = document.getElementById('examCreateProgramCode').textContent;
   const semester = document.getElementById('examCreateSemester').value;
   const branch = document.getElementById('examCreateBranch').value;
-  const regulation = document.getElementById('examCreateRegulation').value;
   const examType = document.getElementById('examCreateType').value;
   const startDateRaw = document.getElementById('examCreateStartDate').value;
   const endDateRaw = document.getElementById('examCreateEndDate').value;
@@ -80,14 +101,14 @@ function createExam() {
   const semShort = semester.replace('Semester ', '');
   const programShort = 'B.E. ' + programName.replace('B.E. ', '').split(' ')[0];
   const label = `Sem ${semShort} ${examType} ${year}`;
-  recentExams.unshift({ label, program: programShort, sem: semShort, type: examType, mode: currentMode, status: 'Pre-Exam', startDate, endDate, fee });
+  recentExams.unshift({ label, program: programShort, programCode, sem: semShort, type: examType, mode: currentMode, status: 'Pre-Exam', startDate, endDate, fee });
   openExam(label);
   const m = modeInfo[currentMode];
   openModal('Exam Created Successfully', `
     <div class="text-center" style="padding:20px">
       <i class="fas fa-check-circle" style="font-size:48px;color:#059669"></i>
       <h3 style="margin-top:12px">Exam Created Successfully</h3>
-      <p class="text-muted">${label} has been created for ${programName} (${branch}), ${regulation}, under ${m.label} mode, scheduled from ${startDate} to ${endDate} with a registration fee of ₹${fee}, and is ready for activation.</p>
+      <p class="text-muted">${label} has been created for ${programName} [${programCode}] (${branch}), under ${m.label} mode, scheduled from ${startDate} to ${endDate} with a registration fee of ₹${fee}, and is ready for activation.</p>
     </div>
   `, `<button class="btn btn-primary" onclick="closeModal();showPage('eligibility')"><i class="fas fa-arrow-right"></i> Proceed to Eligibility</button>`);
   showPage('exam-creation');
@@ -124,6 +145,7 @@ function openExamModal(examLabel) {
     </div>
     <table style="width:100%;border-collapse:collapse">
       <tr><td style="font-weight:600;padding:6px 0;width:140px">Program</td><td>${e.program}</td></tr>
+      <tr><td style="font-weight:600;padding:6px 0">Program Code</td><td>${e.programCode || '—'}</td></tr>
       <tr><td style="font-weight:600;padding:6px 0">Semester</td><td>${e.sem}</td></tr>
       <tr><td style="font-weight:600;padding:6px 0">Exam Type</td><td>${e.type}</td></tr>
       <tr><td style="font-weight:600;padding:6px 0">Control Mode</td><td>${m.label} — ${m.desc}</td></tr>
@@ -154,6 +176,7 @@ function confirmDeleteExam(examLabel) {
     </div>
     <table style="width:100%;border-collapse:collapse">
       <tr><td style="font-weight:600;padding:6px 0;width:140px">Program</td><td>${e.program}</td></tr>
+      <tr><td style="font-weight:600;padding:6px 0">Program Code</td><td>${e.programCode || '—'}</td></tr>
       <tr><td style="font-weight:600;padding:6px 0">Semester</td><td>${e.sem}</td></tr>
       <tr><td style="font-weight:600;padding:6px 0">Exam Type</td><td>${e.type}</td></tr>
       <tr><td style="font-weight:600;padding:6px 0">Control Mode</td><td>${m.label}</td></tr>
@@ -185,7 +208,6 @@ function renderExamCreation() {
   const programOptions = examCreationCatalog.programs.map(p => `<option>${p.name}</option>`).join('');
   const semesterOptions = examCreationCatalog.semesters.map(s => `<option ${s === 'Semester IV' ? 'selected' : ''}>${s}</option>`).join('');
   const branchOptions = examCreationCatalog.programs[0].branches.map(b => `<option>${b}</option>`).join('');
-  const regulationOptions = examCreationCatalog.regulations.map(r => `<option ${r === 'R-2022' ? 'selected' : ''}>${r}</option>`).join('');
   const examTypeOptions = examCreationCatalog.examTypes.map(t => `<option>${t}</option>`).join('');
   const statusBadgeClass = { Active: 'badge-success', 'Pre-Exam': 'badge-warning', Closed: 'badge-danger' };
   const examRows = recentExams.map(e => {
@@ -193,7 +215,7 @@ function renderExamCreation() {
     const modeBadgeClass = e.mode === 'affiliated' ? 'badge-neutral' : 'badge-info';
     const actionLabel = e.status === 'Closed' ? 'View' : 'Open';
     const action = `<button class="btn btn-sm" onclick="openExamModal('${e.label}')">${actionLabel}</button>`;
-    return `<tr><td>${e.label}</td><td>${e.program}</td><td>${e.sem}</td><td>${e.type}</td><td><span class="badge ${modeBadgeClass}">${m.label}</span></td><td>${e.startDate}</td><td>${e.endDate}</td><td><span class="badge ${statusBadgeClass[e.status]}">${e.status}</span></td><td>${action}</td></tr>`;
+    return `<tr><td>${e.label}</td><td>${e.program}</td><td>${e.programCode || '—'}</td><td>${e.sem}</td><td>${e.type}</td><td><span class="badge ${modeBadgeClass}">${m.label}</span></td><td>${e.startDate}</td><td>${e.endDate}</td><td><span class="badge ${statusBadgeClass[e.status]}">${e.status}</span></td><td>${action}</td></tr>`;
   }).join('');
   return `
     <div class="page-content">
@@ -203,21 +225,18 @@ function renderExamCreation() {
         <div class="card-body">
           <div class="form-row">
             <div class="form-group"><label>Academic Year</label><select class="form-control" id="examCreateYear">${yearOptions}</select></div>
-            <div class="form-group"><label>Program</label><select class="form-control" id="examCreateProgram" onchange="updateExamCreateBranches()">${programOptions}</select></div>
+            <div class="form-group"><label>Program</label><select class="form-control" id="examCreateProgram" onchange="updateExamCreateBranches()">${programOptions}</select><div class="hint">Program Code: <span id="examCreateProgramCode">${examCreationCatalog.programs[0].code}</span></div></div>
           </div>
           <div class="form-row">
             <div class="form-group"><label>Semester / Year</label><select class="form-control" id="examCreateSemester">${semesterOptions}</select></div>
             <div class="form-group"><label>Branch</label><select class="form-control" id="examCreateBranch">${branchOptions}</select></div>
           </div>
           <div class="form-row">
-            <div class="form-group"><label>Regulation</label><select class="form-control" id="examCreateRegulation">${regulationOptions}</select></div>
             <div class="form-group"><label>Exam Type</label><select class="form-control" id="examCreateType">${examTypeOptions}</select></div>
-          </div>
-          <div class="form-row">
             <div class="form-group"><label>Start Date</label><input type="date" class="form-control" id="examCreateStartDate"></div>
-            <div class="form-group"><label>End Date</label><input type="date" class="form-control" id="examCreateEndDate"></div>
           </div>
           <div class="form-row">
+            <div class="form-group"><label>End Date</label><input type="date" class="form-control" id="examCreateEndDate"></div>
             <div class="form-group"><label>Registration Fee (₹)</label><input type="number" class="form-control" id="examCreateFee" min="0" step="50" placeholder="e.g. 500" value="500"></div>
           </div>
           <div class="form-group"><label>Exam Control Mode</label></div>
@@ -234,11 +253,11 @@ function renderExamCreation() {
       </div>
 
       <div class="card mt-4">
-        <div class="card-header"><h3><i class="fas fa-history"></i> Recent Exams</h3></div>
+        <div class="card-header"><h3><i class="fas fa-history"></i> Recent Exams</h3><input type="text" class="form-control" style="max-width:200px" placeholder="Search exams..." oninput="liveSearchTable(this)"></div>
         <div class="card-body">
           <div class="table-wrap">
             <table>
-              <tr><th>Exam</th><th>Program</th><th>Sem</th><th>Type</th><th>Mode</th><th>Start Date</th><th>End Date</th><th>Status</th><th></th></tr>
+              <tr><th>Exam</th><th>Program</th><th>Program Code</th><th>Sem</th><th>Type</th><th>Mode</th><th>Start Date</th><th>End Date</th><th>Status</th><th></th></tr>
               ${examRows}
             </table>
           </div>
@@ -271,7 +290,86 @@ let eligibilityApproved = false;
 // identities already used on the Marks Memo page for those exams, so names
 // stay consistent across the demo.
 const eligibilityExams = {
-  'Sem IV Regular Apr 2026': { get students() { return data.students; } },
+  'Sem IV Regular Apr 2026': {
+    // data.students (the 12 Post-Exam-tracked B.E. Computer students) plus
+    // other-program students, so this exam's Program filter has real variety
+    // too — each program below has both an eligible and a not-eligible
+    // example. Post-Exam (Marks Entry, D-Form, Result Processing, Analytics,
+    // Marks Memo) reads from the separate, independently fixed
+    // data.examResults['Sem IV Regular Apr 2026'] rather than this roster, so
+    // these extra students showing up as newly registered (with no marks yet
+    // entered — same as any real student mid-cycle) doesn't touch it.
+    students: [
+      ...data.students,
+      { id: 'S031', name: 'Devika Rane', program: 'B.E. Mechanical', sem: 'IV', status: 'Detained', attendance: 55, feeStatus: 'Paid' },
+      { id: 'S032', name: 'Yusuf Khan', program: 'B.E. Electronics', sem: 'IV', status: 'Active', attendance: 68, feeStatus: 'Paid' },
+      { id: 'S033', name: 'Priyansh Joshi', program: 'B.E. Civil', sem: 'IV', status: 'Inactive', attendance: 80, feeStatus: 'Paid' },
+      { id: 'S034', name: 'Alia Fernandes', program: 'B.E. Electrical', sem: 'IV', status: 'Active', attendance: 60, feeStatus: 'Pending' },
+      { id: 'S043', name: 'Naveen Kumar', program: 'B.E. Mechanical', sem: 'IV', status: 'Active', attendance: 85, feeStatus: 'Paid' },
+      { id: 'S044', name: 'Ishita Chawla', program: 'B.E. Electronics', sem: 'IV', status: 'Active', attendance: 90, feeStatus: 'Paid' },
+      { id: 'S045', name: 'Vivek Nambiar', program: 'B.E. Civil', sem: 'IV', status: 'Active', attendance: 78, feeStatus: 'Paid' },
+      { id: 'S046', name: 'Pallavi Saxena', program: 'B.E. Electrical', sem: 'IV', status: 'Active', attendance: 82, feeStatus: 'Paid' },
+      // Four more eligible students per non-Computer program, so every
+      // program has at least 5 registered students to show on Registration/
+      // Hall Ticket once filtered — not just the one eligible example above.
+      { id: 'S047', name: 'Kunal Bhosale', program: 'B.E. Mechanical', sem: 'IV', status: 'Active', attendance: 85, feeStatus: 'Paid' },
+      { id: 'S048', name: 'Trisha Kulkarni', program: 'B.E. Mechanical', sem: 'IV', status: 'Active', attendance: 90, feeStatus: 'Paid' },
+      { id: 'S049', name: 'Rohan Ghosh', program: 'B.E. Mechanical', sem: 'IV', status: 'Active', attendance: 78, feeStatus: 'Paid' },
+      { id: 'S050', name: 'Meera Desai', program: 'B.E. Mechanical', sem: 'IV', status: 'Active', attendance: 88, feeStatus: 'Paid' },
+      { id: 'S051', name: 'Aarti Iyer', program: 'B.E. Electronics', sem: 'IV', status: 'Active', attendance: 82, feeStatus: 'Paid' },
+      { id: 'S052', name: 'Siddharth Rao', program: 'B.E. Electronics', sem: 'IV', status: 'Active', attendance: 91, feeStatus: 'Paid' },
+      { id: 'S053', name: 'Neha Joshi', program: 'B.E. Electronics', sem: 'IV', status: 'Active', attendance: 76, feeStatus: 'Paid' },
+      { id: 'S054', name: 'Vivaan Shah', program: 'B.E. Electronics', sem: 'IV', status: 'Active', attendance: 89, feeStatus: 'Paid' },
+      { id: 'S055', name: 'Ananya Bhatt', program: 'B.E. Civil', sem: 'IV', status: 'Active', attendance: 84, feeStatus: 'Paid' },
+      { id: 'S056', name: 'Rajesh Kumar', program: 'B.E. Civil', sem: 'IV', status: 'Active', attendance: 93, feeStatus: 'Paid' },
+      { id: 'S057', name: 'Sneha Patil', program: 'B.E. Civil', sem: 'IV', status: 'Active', attendance: 80, feeStatus: 'Paid' },
+      { id: 'S058', name: 'Arjun Menon', program: 'B.E. Civil', sem: 'IV', status: 'Active', attendance: 87, feeStatus: 'Paid' },
+      { id: 'S059', name: 'Priya Nair', program: 'B.E. Electrical', sem: 'IV', status: 'Active', attendance: 90, feeStatus: 'Paid' },
+      { id: 'S060', name: 'Karthik Reddy', program: 'B.E. Electrical', sem: 'IV', status: 'Active', attendance: 79, feeStatus: 'Paid' },
+      { id: 'S061', name: 'Divya Sharma', program: 'B.E. Electrical', sem: 'IV', status: 'Active', attendance: 86, feeStatus: 'Paid' },
+      { id: 'S062', name: 'Manish Gupta', program: 'B.E. Electrical', sem: 'IV', status: 'Active', attendance: 92, feeStatus: 'Paid' },
+      // A couple of students per other semester (I, II, III, V-VIII), spread
+      // across programs, so the Sem filter also has real matches beyond IV —
+      // same reasoning as the Program filter additions above.
+      { id: 'S063', name: 'Yash Kulkarni', program: 'B.E. Computer', sem: 'I', status: 'Active', attendance: 88, feeStatus: 'Paid' },
+      { id: 'S064', name: 'Rutuja More', program: 'B.E. Mechanical', sem: 'I', status: 'Active', attendance: 91, feeStatus: 'Paid' },
+      { id: 'S065', name: 'Aditi Verma', program: 'B.E. Electronics', sem: 'II', status: 'Active', attendance: 84, feeStatus: 'Paid' },
+      { id: 'S066', name: 'Harshad Pawar', program: 'B.E. Civil', sem: 'II', status: 'Active', attendance: 79, feeStatus: 'Paid' },
+      { id: 'S067', name: 'Sanika Joshi', program: 'B.E. Electrical', sem: 'III', status: 'Active', attendance: 90, feeStatus: 'Paid' },
+      { id: 'S068', name: 'Tanmay Deshpande', program: 'B.E. Computer', sem: 'III', status: 'Active', attendance: 85, feeStatus: 'Paid' },
+      { id: 'S069', name: 'Radhika Shetty', program: 'B.E. Mechanical', sem: 'V', status: 'Active', attendance: 92, feeStatus: 'Paid' },
+      { id: 'S070', name: 'Omkar Naik', program: 'B.E. Electronics', sem: 'V', status: 'Active', attendance: 77, feeStatus: 'Paid' },
+      { id: 'S071', name: 'Pooja Kadam', program: 'B.E. Civil', sem: 'VI', status: 'Active', attendance: 89, feeStatus: 'Paid' },
+      { id: 'S072', name: 'Abhishek Rane', program: 'B.E. Electrical', sem: 'VI', status: 'Active', attendance: 83, feeStatus: 'Paid' },
+      { id: 'S073', name: 'Nikita Salvi', program: 'B.E. Computer', sem: 'VII', status: 'Active', attendance: 95, feeStatus: 'Paid' },
+      { id: 'S074', name: 'Girish Thakur', program: 'B.E. Mechanical', sem: 'VII', status: 'Active', attendance: 81, feeStatus: 'Paid' },
+      { id: 'S075', name: 'Shruti Kamble', program: 'B.E. Electronics', sem: 'VIII', status: 'Active', attendance: 87, feeStatus: 'Paid' },
+      { id: 'S076', name: 'Devendra Pillai', program: 'B.E. Civil', sem: 'VIII', status: 'Active', attendance: 93, feeStatus: 'Paid' },
+      // Fills every remaining gap in the Program x Semester grid (5 programs
+      // x 8 semesters) so no combination on the filter returns zero results.
+      { id: 'S077', name: 'Kiran Bedi', program: 'B.E. Computer', sem: 'II', status: 'Active', attendance: 86, feeStatus: 'Paid' },
+      { id: 'S078', name: 'Rachit Malhotra', program: 'B.E. Computer', sem: 'V', status: 'Active', attendance: 90, feeStatus: 'Paid' },
+      { id: 'S079', name: 'Sonal Agarwal', program: 'B.E. Computer', sem: 'VI', status: 'Active', attendance: 82, feeStatus: 'Paid' },
+      { id: 'S080', name: 'Vikas Chandra', program: 'B.E. Computer', sem: 'VIII', status: 'Active', attendance: 94, feeStatus: 'Paid' },
+      { id: 'S081', name: 'Anjali Deshmukh', program: 'B.E. Mechanical', sem: 'II', status: 'Active', attendance: 88, feeStatus: 'Paid' },
+      { id: 'S082', name: 'Suresh Pillai', program: 'B.E. Mechanical', sem: 'III', status: 'Active', attendance: 80, feeStatus: 'Paid' },
+      { id: 'S083', name: 'Kavya Reddy', program: 'B.E. Mechanical', sem: 'VI', status: 'Active', attendance: 91, feeStatus: 'Paid' },
+      { id: 'S084', name: 'Rohit Bhatia', program: 'B.E. Mechanical', sem: 'VIII', status: 'Active', attendance: 78, feeStatus: 'Paid' },
+      { id: 'S085', name: 'Neelam Choudhary', program: 'B.E. Electronics', sem: 'I', status: 'Active', attendance: 85, feeStatus: 'Paid' },
+      { id: 'S086', name: 'Aakash Trivedi', program: 'B.E. Electronics', sem: 'III', status: 'Active', attendance: 92, feeStatus: 'Paid' },
+      { id: 'S087', name: 'Bhavna Iyer', program: 'B.E. Electronics', sem: 'VI', status: 'Active', attendance: 79, feeStatus: 'Paid' },
+      { id: 'S088', name: 'Yogesh Kulkarni', program: 'B.E. Electronics', sem: 'VII', status: 'Active', attendance: 87, feeStatus: 'Paid' },
+      { id: 'S089', name: 'Meenal Sawant', program: 'B.E. Civil', sem: 'I', status: 'Active', attendance: 90, feeStatus: 'Paid' },
+      { id: 'S090', name: 'Prakash Yadav', program: 'B.E. Civil', sem: 'III', status: 'Active', attendance: 83, feeStatus: 'Paid' },
+      { id: 'S091', name: 'Ishaan Kapoor', program: 'B.E. Civil', sem: 'V', status: 'Active', attendance: 88, feeStatus: 'Paid' },
+      { id: 'S092', name: 'Ritu Malviya', program: 'B.E. Civil', sem: 'VII', status: 'Active', attendance: 95, feeStatus: 'Paid' },
+      { id: 'S093', name: 'Sameer Qureshi', program: 'B.E. Electrical', sem: 'I', status: 'Active', attendance: 84, feeStatus: 'Paid' },
+      { id: 'S094', name: 'Deepika Chauhan', program: 'B.E. Electrical', sem: 'II', status: 'Active', attendance: 89, feeStatus: 'Paid' },
+      { id: 'S095', name: 'Nakul Bansal', program: 'B.E. Electrical', sem: 'V', status: 'Active', attendance: 81, feeStatus: 'Paid' },
+      { id: 'S096', name: 'Tanya Sood', program: 'B.E. Electrical', sem: 'VII', status: 'Active', attendance: 93, feeStatus: 'Paid' },
+      { id: 'S097', name: 'Vikram Solanki', program: 'B.E. Electrical', sem: 'VIII', status: 'Active', attendance: 77, feeStatus: 'Paid' },
+    ],
+  },
   'Sem VI Regular Apr 2026': {
     students: [
       { id: 'S011', name: 'Neha Sharma', program: 'B.E. Computer', sem: 'VI', status: 'Active', attendance: 89, feeStatus: 'Paid' },
@@ -280,14 +378,32 @@ const eligibilityExams = {
       { id: 'S014', name: 'Karan Singh', program: 'B.E. Computer', sem: 'VI', status: 'Active', attendance: 85, feeStatus: 'Pending' },
       { id: 'S015', name: 'Meera Iyer', program: 'B.E. Computer', sem: 'VI', status: 'Detained', attendance: 60, feeStatus: 'Paid' },
       { id: 'S016', name: 'Rohit Deshmukh', program: 'B.E. Computer', sem: 'VI', status: 'Active', attendance: 88, feeStatus: 'Paid' },
+      { id: 'S027', name: 'Farhan Sheikh', program: 'B.E. Mechanical', sem: 'VI', status: 'Active', attendance: 90, feeStatus: 'Paid' },
+      { id: 'S028', name: 'Ritika Bansal', program: 'B.E. Electronics', sem: 'VI', status: 'Active', attendance: 70, feeStatus: 'Paid' },
+      { id: 'S029', name: 'Manoj Pillai', program: 'B.E. Civil', sem: 'VI', status: 'Active', attendance: 84, feeStatus: 'Pending' },
+      { id: 'S030', name: 'Sneha Kulkarni', program: 'B.E. Electrical', sem: 'VI', status: 'Detained', attendance: 66, feeStatus: 'Paid' },
+      { id: 'S035', name: 'Ananya Rao', program: 'B.E. Mechanical', sem: 'VI', status: 'Active', attendance: 65, feeStatus: 'Paid' },
+      { id: 'S036', name: 'Rahul Kapoor', program: 'B.E. Electronics', sem: 'VI', status: 'Active', attendance: 82, feeStatus: 'Paid' },
+      { id: 'S037', name: 'Divya Shah', program: 'B.E. Civil', sem: 'VI', status: 'Active', attendance: 91, feeStatus: 'Paid' },
+      { id: 'S038', name: 'Aman Trivedi', program: 'B.E. Electrical', sem: 'VI', status: 'Active', attendance: 77, feeStatus: 'Paid' },
     ],
   },
   'Sem II Supplementary Jan 2026': {
+    // These four extra students are deliberately Not Eligible (Detained /
+    // attendance / Inactive) for the same reason as Sem IV's: this exam is
+    // Closed with real Post-Exam results already tied to S017-S020, so any
+    // new student that reached Registration would show up in Post-Exam with
+    // no result data. Keeping them ineligible confines them to this
+    // Eligibility list, where they still exercise the Program filter.
     students: [
       { id: 'S017', name: 'Akash Tiwari', program: 'B.E. Computer', sem: 'II', status: 'Active', attendance: 68, feeStatus: 'Pending' },
       { id: 'S018', name: 'Pooja Reddy', program: 'B.E. Computer', sem: 'II', status: 'Active', attendance: 82, feeStatus: 'Paid' },
       { id: 'S019', name: 'Siddharth Nair', program: 'B.E. Computer', sem: 'II', status: 'Active', attendance: 91, feeStatus: 'Paid' },
       { id: 'S020', name: 'Tanvi Kulkarni', program: 'B.E. Computer', sem: 'II', status: 'Inactive', attendance: 84, feeStatus: 'Paid' },
+      { id: 'S039', name: 'Karthik Menon', program: 'B.E. Mechanical', sem: 'II', status: 'Active', attendance: 65, feeStatus: 'Paid' },
+      { id: 'S040', name: 'Neha Bhatt', program: 'B.E. Electronics', sem: 'II', status: 'Detained', attendance: 70, feeStatus: 'Paid' },
+      { id: 'S041', name: 'Om Prakash', program: 'B.E. Civil', sem: 'II', status: 'Inactive', attendance: 85, feeStatus: 'Paid' },
+      { id: 'S042', name: 'Zara Sheikh', program: 'B.E. Electrical', sem: 'II', status: 'Active', attendance: 55, feeStatus: 'Pending' },
     ],
   },
 };
@@ -296,10 +412,28 @@ function getEligibilityExamConfig() {
   return eligibilityExams[currentExamLabel] || eligibilityExams['Sem IV Regular Apr 2026'];
 }
 
+// Which Program/Sem the Eligible Student List table is currently narrowed to
+// ('' = all) — separate from the exam selector so the same exam's roster can
+// still be sliced by program/sem once it ever spans more than one of each.
+let eligibilityProgramFilter = '';
+let eligibilitySemFilter = '';
+
 function changeEligibilityExam(value) {
   currentExamLabel = value;
   eligibilityOverrides = {};
   eligibilityApproved = false;
+  eligibilityProgramFilter = '';
+  eligibilitySemFilter = '';
+  showPage('eligibility');
+}
+
+function filterEligibilityProgram(value) {
+  eligibilityProgramFilter = value;
+  showPage('eligibility');
+}
+
+function filterEligibilitySem(value) {
+  eligibilitySemFilter = value;
   showPage('eligibility');
 }
 
@@ -356,7 +490,7 @@ function downloadEligibilityReport(kind) {
   const students = getEligibilityExamConfig().students;
   const rows = students.map(s => {
     const { eligible, reasons, overridden } = effectiveEligibility(s);
-    return `<tr><td>${s.id}</td><td>${s.name}</td><td>${s.program}</td><td>${s.sem}</td><td>${s.status}</td><td>${eligible ? 'Eligible' : 'Not Eligible'}${overridden ? ' (manual override)' : ''}</td><td>${reasons.length ? reasons.join(', ') : '—'}</td></tr>`;
+    return `<tr><td>${s.id}</td><td>${s.name}</td><td>${s.program}</td><td>${getProgramCode(s.program) || '—'}</td><td>${s.sem}</td><td>${s.status}</td><td>${eligible ? 'Eligible' : 'Not Eligible'}${overridden ? ' (manual override)' : ''}</td><td>${reasons.length ? reasons.join(', ') : '—'}</td></tr>`;
   }).join('');
   const eligibleCount = students.filter(s => effectiveEligibility(s).eligible).length;
   const title = kind === 'university' ? 'University Exam Form — Eligible Student List' : 'Eligible Student List';
@@ -369,7 +503,7 @@ function downloadEligibilityReport(kind) {
 <p><strong>Total Students:</strong> ${students.length} &nbsp; <strong>Eligible:</strong> ${eligibleCount} &nbsp; <strong>Not Eligible:</strong> ${students.length - eligibleCount}</p>
 <p><strong>Generated:</strong> ${new Date().toLocaleString()}</p>
 <table>
-<tr><th>Student ID</th><th>Name</th><th>Program</th><th>Sem</th><th>Status</th><th>Eligibility</th><th>Reason(s)</th></tr>
+<tr><th>Student ID</th><th>Name</th><th>Program</th><th>Program Code</th><th>Sem</th><th>Status</th><th>Eligibility</th><th>Reason(s)</th></tr>
 ${rows}
 </table>
 </body></html>`;
@@ -390,12 +524,26 @@ function renderEligibility() {
   const examOptions = Object.keys(eligibilityExams).map(key =>
     `<option value="${key}" ${key === currentExamLabel ? 'selected' : ''}>${key}</option>`
   ).join('');
-  const rows = students.map(s => {
+  const programChoices = getAllProgramShortNames();
+  const semChoices = getAllSemesterCodes();
+  const programFilterSelect = `<select class="form-control" onchange="filterEligibilityProgram(this.value)">
+    <option value="">All Programs</option>
+    ${programChoices.map(p => `<option value="${p}" ${eligibilityProgramFilter === p ? 'selected' : ''}>${p}${getProgramCode(p) ? ` (${getProgramCode(p)})` : ''}</option>`).join('')}
+  </select>`;
+  const semFilterSelect = `<select class="form-control" onchange="filterEligibilitySem(this.value)">
+    <option value="">All Semesters</option>
+    ${semChoices.map(sem => `<option value="${sem}" ${eligibilitySemFilter === sem ? 'selected' : ''}>Sem ${sem}</option>`).join('')}
+  </select>`;
+  const displayStudents = students.filter(s =>
+    (!eligibilityProgramFilter || s.program === eligibilityProgramFilter) &&
+    (!eligibilitySemFilter || s.sem === eligibilitySemFilter)
+  );
+  const rows = displayStudents.map(s => {
     const { eligible, reasons, overridden } = effectiveEligibility(s);
     const reasonNote = reasons.length ? `<div class="text-muted" style="font-size:11px">${reasons.join(', ')}</div>` : '';
     const overrideNote = overridden ? `<div class="text-muted" style="font-size:10px;font-style:italic">Manually overridden</div>` : '';
     const statusBadge = s.status === 'Active' ? 'badge-success' : s.status === 'Inactive' ? 'badge-neutral' : 'badge-danger';
-    return `<tr><td>${s.id}</td><td>${s.name}</td><td>${s.program}</td><td>${s.sem}</td><td><span class="badge ${statusBadge}">${s.status}</span></td><td><span class="badge ${eligible ? 'badge-success' : 'badge-danger'}">${eligible ? 'Eligible' : 'Not Eligible'}</span>${reasonNote}${overrideNote}</td><td><input type="checkbox" ${eligible ? 'checked' : ''} ${eligibilityApproved ? 'disabled' : ''} onchange="toggleEligibilityOverride('${s.id}', this.checked)"></td></tr>`;
+    return `<tr><td>${s.id}</td><td>${s.name}</td><td>${s.program}</td><td>${getProgramCode(s.program) || '—'}</td><td>${s.sem}</td><td><span class="badge ${statusBadge}">${s.status}</span></td><td><span class="badge ${eligible ? 'badge-success' : 'badge-danger'}">${eligible ? 'Eligible' : 'Not Eligible'}</span>${reasonNote}${overrideNote}</td><td><input type="checkbox" ${eligible ? 'checked' : ''} ${eligibilityApproved ? 'disabled' : ''} onchange="toggleEligibilityOverride('${s.id}', this.checked)"></td></tr>`;
   }).join('');
   const eligibleCount = students.filter(s => effectiveEligibility(s).eligible).length;
   const notEligibleCount = students.length - eligibleCount;
@@ -410,6 +558,8 @@ function renderEligibility() {
       <div class="alert alert-info"><i class="fas fa-info-circle"></i> Generate list of eligible students for the selected examination. Eligibility is checked against attendance ≥ 75%, fee status, detained and inactive status.${currentMode !== 'autonomous' ? ' This list can also be exported for university exam form submission.' : ''}</div>
       <div class="filter-bar">
         <select class="form-control" onchange="changeEligibilityExam(this.value)">${examOptions}</select>
+        ${programFilterSelect}
+        ${semFilterSelect}
         <span class="chip"><i class="fas fa-check-circle" style="color:#059669"></i> ${eligibleCount} Eligible</span>
         <span class="chip"><i class="fas fa-times-circle" style="color:#dc2626"></i> ${notEligibleCount} Not Eligible</span>
         <span class="chip"><i class="fas fa-clock"></i> Attendance ≥ 75%</span>
@@ -417,12 +567,12 @@ function renderEligibility() {
         <button class="btn btn-primary btn-sm" style="margin-left:auto" onclick="regenerateEligibleList()" ${eligibilityApproved ? 'disabled title="List is approved and locked — regenerate is unavailable until re-opened"' : ''}><i class="fas fa-sync"></i> Regenerate</button>
       </div>
       <div class="card">
-        <div class="card-header"><h3><i class="fas fa-users"></i> Eligible Student List</h3><div class="flex gap-2"><button class="btn btn-sm" onclick="downloadEligibilityReport('standard')"><i class="fas fa-download"></i> Export</button>${approveControl}</div></div>
+        <div class="card-header"><h3><i class="fas fa-users"></i> Eligible Student List</h3><div class="flex gap-2"><input type="text" class="form-control" style="max-width:200px" placeholder="Search students..." oninput="liveSearchTable(this)"><button class="btn btn-sm" onclick="downloadEligibilityReport('standard')"><i class="fas fa-download"></i> Export</button>${approveControl}</div></div>
         <div class="card-body">
           <div class="table-wrap">
             <table>
-              <tr><th>Student ID</th><th>Name</th><th>Program</th><th>Sem</th><th>Status</th><th>Eligibility</th><th>Select</th></tr>
-              ${rows}
+              <tr><th>Student ID</th><th>Name</th><th>Program</th><th>Program Code</th><th>Sem</th><th>Status</th><th>Eligibility</th><th>Select</th></tr>
+              ${rows || `<tr><td colspan="8" class="text-center text-muted" style="padding:20px">No students match this Program/Semester filter.</td></tr>`}
             </table>
           </div>
         </div>
@@ -441,18 +591,86 @@ function renderEligibility() {
 // subjects"). Vikram Singh (Sem IV) is kept as a backlog example within an
 // otherwise-regular exam, matching the original demo's flavor.
 const registrationSubjects = {
+  // Each program registers its own 6 papers for this exam (a real exam day
+  // runs many programs side by side) — keyed by program so the same short
+  // name like "Maths IV" can mean a different real subject/code depending on
+  // which program's student it is. `codes` mirrors that per-program nesting;
+  // resolveSubjectCode() and getRegistrationRoster() both read it that way.
   'Sem IV Regular Apr 2026': {
-    default: ['DS', 'DBMS', 'OS', 'CN', 'SE', 'Maths IV'],
-    overrides: { S005: { subjects: ['DS', 'DBMS', 'CN', 'SE'], backlog: true } },
+    defaultByProgram: {
+      'B.E. Computer': ['DS', 'DBMS', 'OS', 'CN', 'SE', 'Maths IV'],
+      'B.E. Mechanical': ['Thermodynamics', 'Fluid Mechanics', 'Machine Design', 'Manufacturing Processes', 'Strength of Materials', 'Maths IV'],
+      'B.E. Civil': ['Structural Analysis', 'Hydraulics', 'Geotechnical Engineering', 'Surveying', 'Concrete Technology', 'Maths IV'],
+      'B.E. Electrical': ['Electrical Machines', 'Power Systems', 'Control Systems', 'Electrical Measurements', 'Power Electronics', 'Maths IV'],
+      'B.E. Electronics': ['Analog Electronics', 'Digital Signal Processing', 'Communication Systems', 'Microprocessors', 'VLSI Design', 'Maths IV'],
+    },
+    // One backlog example per program — missing just that program's Maths IV
+    // paper, so each shows up seated alongside its regular cohort for every
+    // other subject (same room, same session) but is correctly absent from
+    // the one paper they're not sitting this exam.
+    overrides: {
+      S005: { subjects: ['DS', 'DBMS', 'CN', 'SE'], backlog: true },
+      S043: { subjects: ['Thermodynamics', 'Fluid Mechanics', 'Machine Design', 'Manufacturing Processes', 'Strength of Materials'], backlog: true },
+      S045: { subjects: ['Structural Analysis', 'Hydraulics', 'Geotechnical Engineering', 'Surveying', 'Concrete Technology'], backlog: true },
+      S046: { subjects: ['Electrical Machines', 'Power Systems', 'Control Systems', 'Electrical Measurements', 'Power Electronics'], backlog: true },
+      S044: { subjects: ['Analog Electronics', 'Digital Signal Processing', 'Communication Systems', 'Microprocessors', 'VLSI Design'], backlog: true },
+    },
+    codes: {
+      'B.E. Computer': { DS: 'CS401', DBMS: 'CS402', OS: 'CS403', CN: 'CS404', SE: 'CS405', 'Maths IV': 'CS406' },
+      'B.E. Mechanical': { Thermodynamics: 'ME401', 'Fluid Mechanics': 'ME402', 'Machine Design': 'ME403', 'Manufacturing Processes': 'ME404', 'Strength of Materials': 'ME405', 'Maths IV': 'ME406' },
+      'B.E. Civil': { 'Structural Analysis': 'CE401', Hydraulics: 'CE402', 'Geotechnical Engineering': 'CE403', Surveying: 'CE404', 'Concrete Technology': 'CE405', 'Maths IV': 'CE406' },
+      'B.E. Electrical': { 'Electrical Machines': 'EE401', 'Power Systems': 'EE402', 'Control Systems': 'EE403', 'Electrical Measurements': 'EE404', 'Power Electronics': 'EE405', 'Maths IV': 'EE406' },
+      'B.E. Electronics': { 'Analog Electronics': 'EC401', 'Digital Signal Processing': 'EC402', 'Communication Systems': 'EC403', Microprocessors: 'EC404', 'VLSI Design': 'EC405', 'Maths IV': 'EC406' },
+    },
   },
   'Sem VI Regular Apr 2026': {
     default: ['ML', 'Cloud Computing', 'Big Data Analytics', 'IoT', 'Deep Learning', 'Blockchain'],
     overrides: {},
+    codes: { ML: 'CS601', 'Cloud Computing': 'CS602', 'Big Data Analytics': 'CS603', IoT: 'CS604', 'Deep Learning': 'CS605', Blockchain: 'CS606' },
   },
   'Sem II Supplementary Jan 2026': {
     perStudentBacklog: { S017: ['Maths I'], S018: ['Physics'], S019: ['Chemistry'], S020: ['English'] },
+    codes: { 'Maths I': 'SUP101', Physics: 'SUP102', Chemistry: 'SUP103', English: 'SUP104' },
   },
 };
+
+// Subject options for the Registration page's subject filter dropdown —
+// the exam's full subject list (or, for backlog-only exams, the distinct
+// set of subjects actually assigned across students) paired with its code.
+// Looks up a subject's code, whether cfg.codes is a flat { name: code } map
+// (Sem VI, Sem II Supplementary — one program, one shared list) or a
+// per-program nested map (Sem IV — 5 programs, so the same short name like
+// "Maths IV" can legitimately mean a different code per program).
+function resolveSubjectCode(cfg, program, name) {
+  if (!cfg.codes) return '';
+  const perProgram = cfg.codes[program];
+  if (perProgram && typeof perProgram === 'object') return perProgram[name] || '';
+  return cfg.codes[name] || '';
+}
+
+function getExamSubjectOptions(examLabel) {
+  const cfg = registrationSubjects[examLabel] || registrationSubjects['Sem IV Regular Apr 2026'];
+  if (cfg.perStudentBacklog) {
+    const names = [...new Set(Object.values(cfg.perStudentBacklog).flat())];
+    return names.map(name => ({ name, code: resolveSubjectCode(cfg, null, name) }));
+  }
+  if (cfg.defaultByProgram) {
+    // Flattened across every program, deduped by name — a name like "Maths
+    // IV" only needs to appear once in the filter dropdown even though each
+    // program's own code for it differs underneath.
+    const seen = new Map();
+    Object.keys(cfg.defaultByProgram).forEach(program => {
+      cfg.defaultByProgram[program].forEach(name => {
+        if (!seen.has(name)) seen.set(name, resolveSubjectCode(cfg, program, name));
+      });
+    });
+    return [...seen.entries()].map(([name, code]) => ({ name, code }));
+  }
+  return cfg.default.map(name => ({ name, code: resolveSubjectCode(cfg, null, name) }));
+}
+
+// Which subject the Registration table is currently filtered to ('' = all).
+let registrationSubjectFilter = '';
 
 // Registration approval is tracked per exam+student so switching exams (or
 // re-approving later) doesn't bleed state across exams. Defaults to Approved
@@ -499,7 +717,8 @@ function getRegistrationRoster(examLabel) {
       backlog = true;
     } else {
       const override = cfg.overrides && cfg.overrides[s.id];
-      subjects = override ? override.subjects : cfg.default;
+      const defaultSubjects = cfg.defaultByProgram ? (cfg.defaultByProgram[s.program] || cfg.default || ['General']) : cfg.default;
+      subjects = override ? override.subjects : defaultSubjects;
       backlog = !!(override && override.backlog);
     }
     const key = registrationKey(s.id, examLabel);
@@ -509,8 +728,15 @@ function getRegistrationRoster(examLabel) {
     const approval = Object.prototype.hasOwnProperty.call(registrationApprovals, key)
       ? registrationApprovals[key]
       : (feeStatus === 'Paid' ? 'Approved' : 'Pending');
-    return { id: s.id, name: s.name, program: s.program, sem: s.sem, subjects, backlog, feeStatus, approval };
+    const subjectCodes = subjects.map(name => resolveSubjectCode(cfg, s.program, name));
+    return { id: s.id, name: s.name, program: s.program, sem: s.sem, subjects, subjectCodes, backlog, feeStatus, approval };
   });
+}
+
+// "DS (CS401), DBMS (CS402)" — subject name paired with its code, falling
+// back to the bare name when an exam has no code on file for it.
+function formatRegisteredSubjects(r) {
+  return r.subjects.map((name, i) => r.subjectCodes[i] ? `${name} (${r.subjectCodes[i]})` : name).join(', ');
 }
 
 function payRegistrationFee(studentId) {
@@ -523,6 +749,12 @@ function payRegistrationFee(studentId) {
 
 function changeRegistrationExam(value) {
   openExam(value);
+  registrationSubjectFilter = '';
+  showPage('registration');
+}
+
+function filterRegistrationSubject(value) {
+  registrationSubjectFilter = value;
   showPage('registration');
 }
 
@@ -564,9 +796,10 @@ function viewRegistrationStudent(studentId) {
       <tr><td style="font-weight:600;padding:6px 0;width:160px">Student ID</td><td>${r.id}</td></tr>
       <tr><td style="font-weight:600;padding:6px 0">Name</td><td>${r.name}</td></tr>
       <tr><td style="font-weight:600;padding:6px 0">Program</td><td>${r.program}</td></tr>
+      <tr><td style="font-weight:600;padding:6px 0">Program Code</td><td>${getProgramCode(r.program) || '—'}</td></tr>
       <tr><td style="font-weight:600;padding:6px 0">Semester</td><td>${r.sem}</td></tr>
       <tr><td style="font-weight:600;padding:6px 0">Exam</td><td>${currentExamLabel}</td></tr>
-      <tr><td style="font-weight:600;padding:6px 0">Subjects Registered</td><td>${r.subjects.join(', ')}${r.backlog ? ' (Backlog)' : ''}</td></tr>
+      <tr><td style="font-weight:600;padding:6px 0">Subjects Registered</td><td>${formatRegisteredSubjects(r)}${r.backlog ? ' (Backlog)' : ''}</td></tr>
       <tr><td style="font-weight:600;padding:6px 0">Registration Fee</td><td>₹${getCurrentExamFee()}</td></tr>
       <tr><td style="font-weight:600;padding:6px 0">Fee Status</td><td><span class="badge ${feeBadge}">${r.feeStatus}</span></td></tr>
       <tr><td style="font-weight:600;padding:6px 0">Approval</td><td><span class="badge ${approvalBadgeClass}">${r.approval}</span></td></tr>
@@ -619,7 +852,7 @@ function importUniversityRegistrationList() {
 function downloadRegistrationReport() {
   const roster = getRegistrationRoster();
   const rows = roster.map(r =>
-    `<tr><td>${r.id}</td><td>${r.name}</td><td>${r.subjects.join(', ')}${r.backlog ? ' (Backlog)' : ''}</td><td>${r.feeStatus}</td><td>${r.approval}</td></tr>`
+    `<tr><td>${r.id}</td><td>${r.name}</td><td>${formatRegisteredSubjects(r)}${r.backlog ? ' (Backlog)' : ''}</td><td>${r.feeStatus}</td><td>${r.approval}</td></tr>`
   ).join('');
   const approvedCount = roster.filter(r => r.approval === 'Approved').length;
   const content = `<!DOCTYPE html>
@@ -661,6 +894,12 @@ function renderRegistration() {
   const examOptions = Object.keys(eligibilityExams).map(key =>
     `<option value="${key}" ${key === currentExamLabel ? 'selected' : ''}>${key}</option>`
   ).join('');
+  const subjectOptions = getExamSubjectOptions(currentExamLabel);
+  const subjectFilterSelect = `<select class="form-control" onchange="filterRegistrationSubject(this.value)">
+    <option value="">All Subjects</option>
+    ${subjectOptions.map(o => `<option value="${o.name}" ${registrationSubjectFilter === o.name ? 'selected' : ''}>${o.name}${o.code ? ` (${o.code})` : ''}</option>`).join('')}
+  </select>`;
+  const displayRoster = registrationSubjectFilter ? roster.filter(r => r.subjects.includes(registrationSubjectFilter)) : roster;
   const filterActions = !isAutonomous
     ? `<button class="btn btn-sm" onclick="downloadRegistrationReport()"><i class="fas fa-file-export"></i> Export to University</button>`
     : '';
@@ -668,8 +907,8 @@ function renderRegistration() {
     ? `<button class="btn btn-success btn-sm" onclick="importUniversityRegistrationList()"><i class="fas fa-file-import"></i> Import University List</button>`
     : `<button class="btn btn-success btn-sm" onclick="finalApproveAllRegistrations()"><i class="fas fa-check"></i> Final Approve All</button>`;
   const approvalBadge = { Approved: 'badge-success', Pending: 'badge-warning', Rejected: 'badge-danger' };
-  const rows = roster.map(r => {
-    const subjectText = `${r.subjects.join(', ')}${r.backlog ? ' (Backlog)' : ''}`;
+  const rows = displayRoster.map(r => {
+    const subjectText = `${formatRegisteredSubjects(r)}${r.backlog ? ' (Backlog)' : ''}`;
     const payFeeBtn = r.feeStatus !== 'Paid'
       ? `<button class="btn btn-sm btn-success" onclick="payRegistrationFee('${r.id}')"><i class="fas fa-rupee-sign"></i> Pay Fee</button>`
       : '';
@@ -680,18 +919,19 @@ function renderRegistration() {
       <div class="alert alert-info"><i class="fas fa-info-circle"></i> ${modeAlert}</div>
       <div class="filter-bar">
         <select class="form-control" onchange="changeRegistrationExam(this.value)">${examOptions}</select>
+        ${subjectFilterSelect}
         <span class="chip"><i class="fas fa-users"></i> ${roster.length} Registered</span>
         <span class="chip"><i class="fas fa-check-circle" style="color:#059669"></i> ${approvedCount} Approved</span>
         <span class="chip"><i class="fas fa-rupee-sign"></i> Fee: ₹${examFee}</span>
         <div class="flex gap-2" style="margin-left:auto">${filterActions}</div>
       </div>
       <div class="card">
-        <div class="card-header"><h3><i class="fas fa-file-signature"></i> Exam Registration / Exam Form</h3>${headerButton}</div>
+        <div class="card-header"><h3><i class="fas fa-file-signature"></i> Exam Registration / Exam Form</h3><div class="flex gap-2"><input type="text" class="form-control" style="max-width:200px" placeholder="Search students..." oninput="liveSearchTable(this)">${headerButton}</div></div>
         <div class="card-body">
           <div class="table-wrap">
             <table>
               <tr><th>Student</th><th>Subjects Registered</th><th>Fee Status</th><th>Approval</th><th></th></tr>
-              ${rows || '<tr><td colspan="5" class="text-center text-muted" style="padding:20px">No eligible students to register for this exam.</td></tr>'}
+              ${rows || `<tr><td colspan="5" class="text-center text-muted" style="padding:20px">${registrationSubjectFilter ? 'No students registered for this subject.' : 'No eligible students to register for this exam.'}</td></tr>`}
             </table>
           </div>
         </div>
@@ -711,38 +951,74 @@ function renderRegistration() {
 const examTimetables = {
   'Sem IV Regular Apr 2026': data.timetableSlots,
   'Sem VI Regular Apr 2026': [
-    { date: '08 Apr 2026', session: 'Morning', subject: 'Machine Learning', code: 'CS601', time: '10:00 - 13:00', duration: '3 hrs' },
-    { date: '10 Apr 2026', session: 'Morning', subject: 'Cloud Computing', code: 'CS602', time: '10:00 - 13:00', duration: '3 hrs' },
-    { date: '12 Apr 2026', session: 'Morning', subject: 'Big Data Analytics', code: 'CS603', time: '10:00 - 12:00', duration: '2 hrs' },
-    { date: '14 Apr 2026', session: 'Morning', subject: 'Internet of Things', code: 'CS604', time: '10:00 - 12:00', duration: '2 hrs' },
-    { date: '16 Apr 2026', session: 'Morning', subject: 'Deep Learning', code: 'CS605', time: '10:00 - 12:00', duration: '2 hrs' },
-    { date: '18 Apr 2026', session: 'Morning', subject: 'Blockchain Technology', code: 'CS606', time: '10:00 - 13:00', duration: '3 hrs' },
+    { date: '08 Apr 2026', session: 'Morning', subject: 'Machine Learning', code: 'CS601', time: '10:00 - 13:00', duration: '3 hrs', program: 'B.E. Computer' },
+    { date: '10 Apr 2026', session: 'Morning', subject: 'Cloud Computing', code: 'CS602', time: '10:00 - 13:00', duration: '3 hrs', program: 'B.E. Computer' },
+    { date: '12 Apr 2026', session: 'Morning', subject: 'Big Data Analytics', code: 'CS603', time: '10:00 - 12:00', duration: '2 hrs', program: 'B.E. Computer' },
+    { date: '14 Apr 2026', session: 'Morning', subject: 'Internet of Things', code: 'CS604', time: '10:00 - 12:00', duration: '2 hrs', program: 'B.E. Computer' },
+    { date: '16 Apr 2026', session: 'Morning', subject: 'Deep Learning', code: 'CS605', time: '10:00 - 12:00', duration: '2 hrs', program: 'B.E. Computer' },
+    { date: '18 Apr 2026', session: 'Morning', subject: 'Blockchain Technology', code: 'CS606', time: '10:00 - 13:00', duration: '3 hrs', program: 'B.E. Computer' },
   ],
   'Sem II Supplementary Jan 2026': [
-    { date: '12 Jan 2026', session: 'Morning', subject: 'Mathematics I', code: 'SUP101', time: '10:00 - 13:00', duration: '3 hrs' },
-    { date: '14 Jan 2026', session: 'Morning', subject: 'Physics', code: 'SUP102', time: '10:00 - 12:00', duration: '2 hrs' },
-    { date: '16 Jan 2026', session: 'Morning', subject: 'Chemistry', code: 'SUP103', time: '10:00 - 12:00', duration: '2 hrs' },
-    { date: '18 Jan 2026', session: 'Afternoon', subject: 'English', code: 'SUP104', time: '14:00 - 16:00', duration: '2 hrs' },
+    { date: '12 Jan 2026', session: 'Morning', subject: 'Mathematics I', code: 'SUP101', time: '10:00 - 13:00', duration: '3 hrs', program: 'B.E. Computer' },
+    { date: '14 Jan 2026', session: 'Morning', subject: 'Physics', code: 'SUP102', time: '10:00 - 12:00', duration: '2 hrs', program: 'B.E. Computer' },
+    { date: '16 Jan 2026', session: 'Morning', subject: 'Chemistry', code: 'SUP103', time: '10:00 - 12:00', duration: '2 hrs', program: 'B.E. Computer' },
+    { date: '18 Jan 2026', session: 'Afternoon', subject: 'English', code: 'SUP104', time: '14:00 - 16:00', duration: '2 hrs', program: 'B.E. Computer' },
   ],
 };
 
 // Subjects offered when adding a slot, matched to the exam being scheduled —
 // falls back to the Sem IV master subject catalog (data.subjects) for any
-// exam without its own list.
+// exam without its own list. Sem IV's list spans all 5 programs (not just
+// Computer) since a real exam day runs many programs' papers side by side —
+// each entry is tagged with `program` so Add Slot can offer a Program
+// selector and only block a genuine same-students overlap (see
+// openAddSlotModal), not just any two exams sharing a date/time.
 const examSubjectCatalog = {
+  'Sem IV Regular Apr 2026': [
+    { code: 'CS401', name: 'Data Structures & Algorithms', program: 'B.E. Computer' },
+    { code: 'CS402', name: 'Database Management Systems', program: 'B.E. Computer' },
+    { code: 'CS403', name: 'Operating Systems', program: 'B.E. Computer' },
+    { code: 'CS404', name: 'Computer Networks', program: 'B.E. Computer' },
+    { code: 'CS405', name: 'Software Engineering', program: 'B.E. Computer' },
+    { code: 'CS406', name: 'Mathematics IV', program: 'B.E. Computer' },
+    { code: 'ME401', name: 'Thermodynamics', program: 'B.E. Mechanical' },
+    { code: 'ME402', name: 'Fluid Mechanics', program: 'B.E. Mechanical' },
+    { code: 'ME403', name: 'Machine Design', program: 'B.E. Mechanical' },
+    { code: 'ME404', name: 'Manufacturing Processes', program: 'B.E. Mechanical' },
+    { code: 'ME405', name: 'Strength of Materials', program: 'B.E. Mechanical' },
+    { code: 'ME406', name: 'Engineering Mathematics IV', program: 'B.E. Mechanical' },
+    { code: 'CE401', name: 'Structural Analysis', program: 'B.E. Civil' },
+    { code: 'CE402', name: 'Hydraulics', program: 'B.E. Civil' },
+    { code: 'CE403', name: 'Geotechnical Engineering', program: 'B.E. Civil' },
+    { code: 'CE404', name: 'Surveying', program: 'B.E. Civil' },
+    { code: 'CE405', name: 'Concrete Technology', program: 'B.E. Civil' },
+    { code: 'CE406', name: 'Engineering Mathematics IV', program: 'B.E. Civil' },
+    { code: 'EE401', name: 'Electrical Machines', program: 'B.E. Electrical' },
+    { code: 'EE402', name: 'Power Systems', program: 'B.E. Electrical' },
+    { code: 'EE403', name: 'Control Systems', program: 'B.E. Electrical' },
+    { code: 'EE404', name: 'Electrical Measurements', program: 'B.E. Electrical' },
+    { code: 'EE405', name: 'Power Electronics', program: 'B.E. Electrical' },
+    { code: 'EE406', name: 'Engineering Mathematics IV', program: 'B.E. Electrical' },
+    { code: 'EC401', name: 'Analog Electronics', program: 'B.E. Electronics' },
+    { code: 'EC402', name: 'Digital Signal Processing', program: 'B.E. Electronics' },
+    { code: 'EC403', name: 'Communication Systems', program: 'B.E. Electronics' },
+    { code: 'EC404', name: 'Microprocessors', program: 'B.E. Electronics' },
+    { code: 'EC405', name: 'VLSI Design', program: 'B.E. Electronics' },
+    { code: 'EC406', name: 'Engineering Mathematics IV', program: 'B.E. Electronics' },
+  ],
   'Sem VI Regular Apr 2026': [
-    { code: 'CS601', name: 'Machine Learning' },
-    { code: 'CS602', name: 'Cloud Computing' },
-    { code: 'CS603', name: 'Big Data Analytics' },
-    { code: 'CS604', name: 'Internet of Things' },
-    { code: 'CS605', name: 'Deep Learning' },
-    { code: 'CS606', name: 'Blockchain Technology' },
+    { code: 'CS601', name: 'Machine Learning', program: 'B.E. Computer' },
+    { code: 'CS602', name: 'Cloud Computing', program: 'B.E. Computer' },
+    { code: 'CS603', name: 'Big Data Analytics', program: 'B.E. Computer' },
+    { code: 'CS604', name: 'Internet of Things', program: 'B.E. Computer' },
+    { code: 'CS605', name: 'Deep Learning', program: 'B.E. Computer' },
+    { code: 'CS606', name: 'Blockchain Technology', program: 'B.E. Computer' },
   ],
   'Sem II Supplementary Jan 2026': [
-    { code: 'SUP101', name: 'Mathematics I' },
-    { code: 'SUP102', name: 'Physics' },
-    { code: 'SUP103', name: 'Chemistry' },
-    { code: 'SUP104', name: 'English' },
+    { code: 'SUP101', name: 'Mathematics I', program: 'B.E. Computer' },
+    { code: 'SUP102', name: 'Physics', program: 'B.E. Computer' },
+    { code: 'SUP103', name: 'Chemistry', program: 'B.E. Computer' },
+    { code: 'SUP104', name: 'English', program: 'B.E. Computer' },
   ],
 };
 
@@ -794,82 +1070,30 @@ function formatExamWindow(slots) {
   return mon1 === mon2 ? `${d1}-${d2} ${mon2}` : `${d1} ${mon1} - ${d2} ${mon2}`;
 }
 
-// Real, data-driven checks (not canned copy): flags an actual double-booked
-// session, a day that needs more rooms than the ERP has on file, and any
-// slot whose duration falls outside the two credit-based durations this app
-// ever schedules (2 hrs / 3 hrs).
-function getTimetableValidation(slots) {
-  const seenSlot = new Map();
-  let overlap = null;
-  slots.forEach(s => {
-    const key = s.date + '|' + s.session;
-    if (seenSlot.has(key)) overlap = { a: seenSlot.get(key), b: s };
-    else seenSlot.set(key, s);
-  });
-
-  const roomCount = (typeof data !== 'undefined' && data.rooms) ? data.rooms.length : 0;
-  const perDay = {};
-  slots.forEach(s => { perDay[s.date] = (perDay[s.date] || 0) + 1; });
-  const maxPerDay = Math.max(0, ...Object.values(perDay));
-  const roomsOk = roomCount === 0 || maxPerDay <= roomCount;
-
-  const allowedDurations = ['2 hrs', '3 hrs'];
-  const badDuration = slots.find(s => !allowedDurations.includes(s.duration));
-
-  return [
-    {
-      name: 'Subject overlap',
-      detail: overlap
-        ? `${overlap.a.subject} and ${overlap.b.subject} both scheduled ${overlap.a.date} (${overlap.a.session})`
-        : 'No student has two papers in the same session',
-      status: overlap ? 'Review' : 'Clear',
-    },
-    {
-      name: 'Room availability',
-      detail: roomCount
-        ? `${roomCount} room(s) on file; up to ${maxPerDay} session(s) scheduled on the busiest day`
-        : 'No room data available to check against',
-      status: roomsOk ? 'Clear' : 'Review',
-    },
-    {
-      name: 'Duration rules',
-      detail: badDuration
-        ? `${badDuration.subject} duration (${badDuration.duration}) is outside the credit-based 2-3 hr range`
-        : 'Credit-based duration matches regulation (2-3 hrs)',
-      status: badDuration ? 'Review' : 'Clear',
-    },
-  ];
-}
-
 function renderTimetable() {
   const isAffiliated = currentMode === 'affiliated';
   const modeAlert = isAffiliated
     ? 'Affiliated: Import or manually enter the university-released timetable.'
     : currentMode === 'hybrid'
       ? 'Hybrid: Create internal/practical timetable in ERP; import the university timetable for external subjects.'
-      : 'Autonomous: Create the timetable directly in ERP and validate conflicts before publishing.';
+      : 'Autonomous: Create the timetable directly in ERP.';
   const slots = getExamTimetableSlots(currentExamLabel);
   const publishedCount = slots.filter(s => s.published !== false).length;
-  const checks = getTimetableValidation(slots);
-  const reviewChecks = checks.filter(c => c.status === 'Review');
   const examWindow = formatExamWindow(slots);
   const uniqueSessions = [...new Set(slots.map(s => s.session))];
   const sessionsSummary = slots.length
     ? `${uniqueSessions.join('/') || 'No'} session(s) for ${slots.length} theory paper${slots.length === 1 ? '' : 's'}`
     : 'No sessions scheduled yet';
-  const flagsSummary = reviewChecks.length
-    ? `${reviewChecks.map(c => c.name).join(', ')} — review before final publish`
-    : 'All checks clear — ready to publish';
   const examOptions = Object.keys(eligibilityExams).map(key =>
     `<option value="${key}" ${key === currentExamLabel ? 'selected' : ''}>${key}</option>`
   ).join('');
   const createActions = !isAffiliated
-    ? `<button class="btn btn-primary btn-sm" onclick="openAddSlotModal()"><i class="fas fa-plus"></i> Add Slot</button><button class="btn btn-sm" onclick="validateTimetableConflicts()"><i class="fas fa-check"></i> Validate Conflicts</button>`
+    ? `<button class="btn btn-primary btn-sm" onclick="openAddSlotModal()"><i class="fas fa-plus"></i> Add Slot</button>`
     : '';
   const importAction = currentMode !== 'autonomous'
     ? `<button class="btn ${isAffiliated?'btn-primary':''} btn-sm" onclick="showActionModal('Import University Timetable','Select the university-released timetable file to import exam dates and sessions.', {icon:'fa-file-import', confirmLabel:'Choose File', confirmIcon:'fa-upload'})"><i class="fas fa-file-import"></i> Import University Timetable</button>`
     : '';
-  const rows = slots.map(s => {
+  const rows = slots.map((s, i) => {
     const isPublished = s.published !== false;
     const session = TIMETABLE_SESSION_STYLE[s.session] || { cls: 'badge-neutral', icon: 'fa-clock' };
     return `<tr>
@@ -885,17 +1109,9 @@ function renderTimetable() {
       <td><span class="badge badge-neutral"><i class="fas fa-clock"></i> ${s.time}</span></td>
       <td><span class="text-muted"><i class="fas fa-stopwatch"></i> ${s.duration}</span></td>
       <td><span class="badge ${isPublished ? 'badge-success' : 'badge-warning'}"><i class="fas ${isPublished ? 'fa-check-circle' : 'fa-hourglass-half'}"></i> ${isPublished ? 'Published' : 'Scheduled'}</span></td>
+      <td>${isPublished ? '' : `<button class="btn btn-sm btn-danger" onclick="removeTimetableSlot(${i})"><i class="fas fa-trash"></i> Remove</button>`}</td>
     </tr>`;
   }).join('');
-  const checkRows = checks.map(c => `
-    <div class="check-row">
-      <div>
-        <div class="check-name">${c.name}</div>
-        <div class="check-detail">${c.detail}</div>
-      </div>
-      <span class="badge ${c.status === 'Clear' ? 'badge-success' : 'badge-warning'}">${c.status}</span>
-    </div>
-  `).join('');
   return `
     <div class="page-content">
       <div class="alert alert-info"><i class="fas fa-info-circle"></i> ${modeAlert}</div>
@@ -912,12 +1128,6 @@ function renderTimetable() {
           <div class="value" style="font-size:22px">${examWindow}</div>
           <div class="sub">${sessionsSummary}</div>
         </div>
-        <div class="stat-card ${reviewChecks.length ? 'stat-warning' : ''}">
-          <i class="fas fa-triangle-exclamation icon"></i>
-          <div class="label">Review Flags</div>
-          <div class="value">${reviewChecks.length}</div>
-          <div class="sub">${flagsSummary}</div>
-        </div>
       </div>
       <div class="filter-bar">
         <select class="form-control" onchange="changeTimetableExam(this.value)">${examOptions}</select>
@@ -926,47 +1136,77 @@ function renderTimetable() {
         <button class="btn btn-success btn-sm" style="margin-left:auto" onclick="publishTimetable()"><i class="fas fa-check"></i> Publish Timetable</button>
       </div>
       <div class="card">
-        <div class="card-header"><h3><i class="fas fa-calendar-alt"></i> Exam Timetable</h3><span class="text-muted">${slots.length} subject(s) scheduled</span></div>
+        <div class="card-header"><h3><i class="fas fa-calendar-alt"></i> Exam Timetable</h3><div class="flex gap-2" style="align-items:center"><input type="text" class="form-control" style="max-width:200px" placeholder="Search subjects..." oninput="liveSearchTable(this)"><span class="text-muted">${slots.length} subject(s) scheduled</span></div></div>
         <div class="card-body">
           <div class="table-wrap">
             <table>
-              <tr><th>Date</th><th>Session</th><th>Subject</th><th>Time</th><th>Duration</th><th>Status</th></tr>
-              ${rows || '<tr><td colspan="6" class="text-center text-muted" style="padding:20px">No slots scheduled yet for this exam.</td></tr>'}
+              <tr><th>Date</th><th>Session</th><th>Subject</th><th>Time</th><th>Duration</th><th>Status</th><th></th></tr>
+              ${rows || '<tr><td colspan="7" class="text-center text-muted" style="padding:20px">No slots scheduled yet for this exam.</td></tr>'}
             </table>
           </div>
         </div>
-      </div>
-      <div class="card mt-4">
-        <div class="card-header"><h3><i class="fas fa-shield-halved"></i> Validation Checks</h3></div>
-        <div class="card-body">${checkRows}</div>
       </div>
     </div>
   `;
 }
 
-function validateTimetableConflicts() {
+// Only an unpublished ("Scheduled") slot can be removed outright — once a
+// slot is Published, Hall Ticket and Seating Plan may already depend on it,
+// so pulling it here would silently break those pages.
+function removeTimetableSlot(index) {
   const slots = getExamTimetableSlots(currentExamLabel);
-  const checks = getTimetableValidation(slots);
-  const failed = checks.filter(c => c.status === 'Review');
-  if (failed.length === 0) {
-    showActionModal('Validate Conflicts', `Checked all ${slots.length} scheduled subjects for date, room and duration conflicts — no conflicts found.`, {
-      icon: 'fa-check-circle', iconColor: 'var(--success)', showCancel: false, confirmLabel: 'OK',
-    });
-  } else {
-    showActionModal('Conflicts Found', failed.map(c => `${c.name}: ${c.detail}`).join(' '), {
-      icon: 'fa-triangle-exclamation', iconColor: 'var(--warning)', showCancel: false, confirmLabel: 'OK',
-    });
-  }
+  const slot = slots[index];
+  if (!slot || slot.published !== false) return;
+  showActionModal('Remove Slot', `Remove ${slot.subject} (${slot.code}) scheduled ${slot.date} (${slot.session}) from the timetable? This cannot be undone.`, {
+    icon: 'fa-trash', iconColor: 'var(--danger)', confirmLabel: 'Remove', confirmClass: 'btn-danger', confirmIcon: 'fa-trash',
+    onConfirm: function () {
+      slots.splice(index, 1);
+      showPage('timetable');
+      showToast(slot.subject + ' removed from the timetable');
+    }
+  });
 }
 
 // ============================================================
 // HALL TICKET
 // ============================================================
+// Semester -> which year of a 4-year B.E. program a student is in (I/II =
+// Year 1, III/IV = Year 2, V/VI = Year 3, VII/VIII = Year 4), used to derive
+// a plausible admission year for the Seat Number.
+const SEM_TO_YEAR_OF_STUDY = { I: 1, II: 1, III: 2, IV: 2, V: 3, VI: 3, VII: 4, VIII: 4 };
+
+function getExamYear(examLabel) {
+  const m = /\d{4}/.exec(examLabel || '');
+  return m ? Number(m[0]) : new Date().getFullYear();
+}
+
+// "COMP/25/001" — program code / 2-digit admission year (derived from the
+// exam's year minus how many years into the program this semester is) /
+// 3-digit serial within that program+admission-year batch. Serials are
+// assigned in stable student-ID order so the same student always gets the
+// same seat number on every render.
+function computeSeatNumbers(students, examLabel) {
+  const examYear = getExamYear(examLabel);
+  const sorted = [...students].sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
+  const counters = {};
+  const map = {};
+  sorted.forEach(s => {
+    const code = getProgramCode(s.program) || 'GEN';
+    const yearOfStudy = SEM_TO_YEAR_OF_STUDY[s.sem] || 1;
+    const admissionYearShort = String(examYear - (yearOfStudy - 1)).slice(-2);
+    const key = `${code}/${admissionYearShort}`;
+    counters[key] = (counters[key] || 0) + 1;
+    map[s.id] = `${key}/${String(counters[key]).padStart(3, '0')}`;
+  });
+  return map;
+}
+
 function downloadHallTicket(studentId, examLabel) {
   examLabel = examLabel || currentExamLabel;
   const s = getRegistrationRoster(examLabel).find(st => st.id === studentId);
   if (!s) return;
   const hallTicketNo = 'HT-' + studentId;
+  const seatNumber = computeSeatNumbers(getRegistrationRoster(examLabel), examLabel)[studentId];
   const m = modeInfo[currentMode];
   const subjectRows = getExamTimetableSlots(examLabel).map(slot =>
     `<tr><td>${slot.code}</td><td>${slot.subject}</td><td>${slot.date}</td><td>${slot.session}</td><td>${slot.time}</td></tr>`
@@ -1006,9 +1246,11 @@ function downloadHallTicket(studentId, examLabel) {
 <div class="top-row">
   <table style="margin-bottom:0">
     <tr><td style="font-weight:600;width:160px">Hall Ticket No.</td><td>${hallTicketNo}</td></tr>
+    <tr><td style="font-weight:600">Seat Number</td><td>${seatNumber}</td></tr>
     <tr><td style="font-weight:600">Student Name</td><td>${s.name}</td></tr>
     <tr><td style="font-weight:600">Student ID</td><td>${s.id}</td></tr>
     <tr><td style="font-weight:600">Program</td><td>${s.program}</td></tr>
+    <tr><td style="font-weight:600">Program Code</td><td>${getProgramCode(s.program) || '—'}</td></tr>
     <tr><td style="font-weight:600">Semester</td><td>${s.sem}</td></tr>
     <tr><td style="font-weight:600">Exam</td><td>${examLabel}</td></tr>
   </table>
@@ -1050,8 +1292,26 @@ function downloadHallTicket(studentId, examLabel) {
   showToast('Hall ticket downloaded for ' + s.name);
 }
 
+// Which Program/Sem the (Exam Branch) Hall Tickets table is narrowed to
+// ('' = all); irrelevant to a logged-in student, whose table always shows
+// their own tickets only.
+let hallTicketProgramFilter = '';
+let hallTicketSemFilter = '';
+
 function changeHallTicketExam(value) {
   openExam(value);
+  hallTicketProgramFilter = '';
+  hallTicketSemFilter = '';
+  showPage('hallticket');
+}
+
+function filterHallTicketProgram(value) {
+  hallTicketProgramFilter = value;
+  showPage('hallticket');
+}
+
+function filterHallTicketSem(value) {
+  hallTicketSemFilter = value;
   showPage('hallticket');
 }
 
@@ -1073,12 +1333,31 @@ function renderHallTicket() {
   // studentSemData) round out the history with earlier exams, since this
   // student is only ever "live-registered" for the one current exam above.
   const pastTickets = isStudent && typeof studentPastHallTickets !== 'undefined' ? studentPastHallTickets : [];
+  const programChoices = getAllProgramShortNames();
+  const semChoices = getAllSemesterCodes();
+  const displayRoster = roster.filter(s =>
+    (!hallTicketProgramFilter || s.program === hallTicketProgramFilter) &&
+    (!hallTicketSemFilter || s.sem === hallTicketSemFilter)
+  );
+  // Computed against the full unfiltered roster, not displayRoster — seat
+  // numbers group students by program+admission-year and assign serials
+  // within each group, so computing them off whatever subset the Program/Sem
+  // filter currently shows would reset every group's counter to 1 each time
+  // (most rows collapsing to ".../001"), and a student's own seat number
+  // would shift depending on which filter happened to be applied.
+  const seatNumbers = computeSeatNumbers(roster, currentExamLabel);
   const liveRows = isStudent
-    ? myTickets.map(({ examLabel, s }) => `<tr><td>${s.id}</td><td>${s.name}</td><td>HT-${s.id}</td><td>${s.program}</td><td>${examLabel}</td><td><span class="badge badge-success">Generated</span></td><td><button class="btn btn-sm" onclick="downloadHallTicket('${s.id}','${examLabel}')"><i class="fas fa-download"></i> PDF</button></td></tr>`).join('')
-    : roster.map(s => `<tr><td>${s.id}</td><td>${s.name}</td><td>HT-${s.id}</td><td>${s.program}</td><td><span class="badge badge-success">Generated</span></td><td><button class="btn btn-sm" onclick="downloadHallTicket('${s.id}')"><i class="fas fa-download"></i> PDF</button></td></tr>`).join('');
-  const pastRows = pastTickets.map(t => `<tr><td>${CURRENT_STUDENT_ID}</td><td>Aarav Sharma</td><td>${t.hallTicketNo}</td><td>B.E. Computer</td><td>${t.examLabel}</td><td><span class="badge badge-neutral">Closed</span></td><td><button class="btn btn-sm" onclick="downloadPastHallTicket('${t.examLabel}')"><i class="fas fa-download"></i> PDF</button></td></tr>`).join('');
+    ? myTickets.map(({ examLabel, s }) => {
+        const seatNo = computeSeatNumbers(getRegistrationRoster(examLabel), examLabel)[s.id];
+        return `<tr><td>${s.id}</td><td>${s.name}</td><td>HT-${s.id}</td><td>${seatNo}</td><td>${s.program}</td><td>${getProgramCode(s.program) || '—'}</td><td>${s.sem}</td><td>${examLabel}</td><td><span class="badge badge-success">Generated</span></td><td><button class="btn btn-sm" onclick="downloadHallTicket('${s.id}','${examLabel}')"><i class="fas fa-download"></i> PDF</button></td></tr>`;
+      }).join('')
+    : displayRoster.map(s => `<tr><td>${s.id}</td><td>${s.name}</td><td>HT-${s.id}</td><td>${seatNumbers[s.id]}</td><td>${s.program}</td><td>${getProgramCode(s.program) || '—'}</td><td>${s.sem}</td><td><span class="badge badge-success">Generated</span></td><td><button class="btn btn-sm" onclick="downloadHallTicket('${s.id}')"><i class="fas fa-download"></i> PDF</button></td></tr>`).join('');
+  const pastRows = pastTickets.map(t => {
+    const semMatch = t.examLabel.match(/^Sem (\S+)/);
+    return `<tr><td>${CURRENT_STUDENT_ID}</td><td>Aarav Sharma</td><td>${t.hallTicketNo}</td><td class="text-muted">—</td><td>B.E. Computer</td><td>${getProgramCode('B.E. Computer') || '—'}</td><td>${semMatch ? semMatch[1] : '—'}</td><td>${t.examLabel}</td><td><span class="badge badge-neutral">Closed</span></td><td><button class="btn btn-sm" onclick="downloadPastHallTicket('${t.examLabel}')"><i class="fas fa-download"></i> PDF</button></td></tr>`;
+  }).join('');
   const rows = liveRows + pastRows;
-  const visibleCount = isStudent ? myTickets.length + pastTickets.length : roster.length;
+  const visibleCount = isStudent ? myTickets.length + pastTickets.length : displayRoster.length;
   const isAffiliated = currentMode === 'affiliated';
   const modeAlert = isAffiliated
     ? 'Affiliated: Import university hall ticket numbers or PDFs and map them to students.'
@@ -1092,6 +1371,18 @@ function renderHallTicket() {
     ? `<select class="form-control" onchange="changeHallTicketExam(this.value)">${Object.keys(eligibilityExams).map(key =>
         `<option value="${key}" ${key === currentExamLabel ? 'selected' : ''}>${key}</option>`
       ).join('')}</select>`
+    : '';
+  const programFilterSelect = !isStudent
+    ? `<select class="form-control" onchange="filterHallTicketProgram(this.value)">
+        <option value="">All Programs</option>
+        ${programChoices.map(p => `<option value="${p}" ${hallTicketProgramFilter === p ? 'selected' : ''}>${p}${getProgramCode(p) ? ` (${getProgramCode(p)})` : ''}</option>`).join('')}
+      </select>`
+    : '';
+  const semFilterSelect = !isStudent
+    ? `<select class="form-control" onchange="filterHallTicketSem(this.value)">
+        <option value="">All Semesters</option>
+        ${semChoices.map(sem => `<option value="${sem}" ${hallTicketSemFilter === sem ? 'selected' : ''}>Sem ${sem}</option>`).join('')}
+      </select>`
     : '';
   const generateBtn = !isAffiliated && !isStudent
     ? `<button class="btn btn-primary btn-sm" onclick="showActionModal('Generate All Hall Tickets','Generate hall tickets for all ${roster.length} registered students of ${currentExamLabel}? This will create hall ticket numbers and PDFs.', {icon:'fa-magic', confirmLabel:'Generate All', confirmIcon:'fa-check'})"><i class="fas fa-magic"></i> Generate All</button>`
@@ -1108,17 +1399,19 @@ function renderHallTicket() {
       ${isStudent ? '' : `
       <div class="filter-bar">
         ${examSelector}
+        ${programFilterSelect}
+        ${semFilterSelect}
         ${generateBtn}
         ${importBtn}
         ${publishBtn}
       </div>`}
       <div class="card">
-        <div class="card-header"><h3><i class="fas fa-ticket-alt"></i> ${isStudent ? 'My Hall Tickets' : 'Hall Tickets'}</h3><span class="text-muted">Total: ${visibleCount}</span></div>
+        <div class="card-header"><h3><i class="fas fa-ticket-alt"></i> ${isStudent ? 'My Hall Tickets' : 'Hall Tickets'}</h3><div class="flex gap-2" style="align-items:center"><input type="text" class="form-control" style="max-width:200px" placeholder="Search students..." oninput="liveSearchTable(this)"><span class="text-muted">Total: ${visibleCount}</span></div></div>
         <div class="card-body">
           <div class="table-wrap">
             <table>
-              <tr><th>Student ID</th><th>Name</th><th>Hall Ticket No.</th><th>Program</th>${isStudent ? '<th>Exam</th>' : ''}<th>Status</th><th></th></tr>
-              ${rows || `<tr><td colspan="${isStudent ? 7 : 6}" class="text-center text-muted" style="padding:20px">${isStudent ? 'No hall tickets found for your account yet.' : 'No registered students for this exam yet.'}</td></tr>`}
+              <tr><th>Student ID</th><th>Name</th><th>Hall Ticket No.</th><th>Seat No.</th><th>Program</th><th>Program Code</th><th>Sem</th>${isStudent ? '<th>Exam</th>' : ''}<th>Status</th><th></th></tr>
+              ${rows || `<tr><td colspan="${isStudent ? 10 : 9}" class="text-center text-muted" style="padding:20px">${isStudent ? 'No hall tickets found for your account yet.' : (roster.length ? 'No students match this Program/Semester filter.' : 'No registered students for this exam yet.')}</td></tr>`}
             </table>
           </div>
         </div>
@@ -1131,79 +1424,424 @@ function renderHallTicket() {
 // SEATING
 // ============================================================
 let selectedSeatingSlotIndex = 0;
+// Manual Assignment view toggle + the set of currently checked (unassigned
+// or assigned) student IDs used by both drag-and-drop and the "Move
+// Selected" bulk-checkbox action.
+let seatingManualMode = false;
+let seatingSelectedIds = new Set();
+// Per exam+slot room assignment, keyed by seatingKey(). Populated lazily
+// (auto-filled by capacity order) the first time a slot is opened, then
+// mutated in place by manual drag/drop, checkbox bulk-move, and bulk upload
+// — so switching slots or exams never bleeds one session's seating into
+// another's.
+const seatingAssignments = {};
 
 function changeSeatingSlot(value) {
   selectedSeatingSlotIndex = Number(value);
+  seatingManualMode = false;
+  seatingSelectedIds.clear();
   showPage('seating');
 }
 
-// Allocates a subject's appearing students (verifiedSheets, as a stand-in for
-// registered/appearing count) across the ERP's room list in capacity order,
-// so every exam date/session shows its own room-wise seating breakdown
-// instead of one hardcoded table for every session.
-function computeSeatingAllocation(subjectCode) {
-  const subject = data.subjects.find(s => s.code === subjectCode) || data.subjects[0];
-  let remaining = subject.verifiedSheets;
-  let seatCursor = 1;
-  const rows = data.rooms.map(r => {
-    const allocated = Math.max(0, Math.min(r.capacity, remaining));
-    remaining -= allocated;
-    const start = seatCursor;
-    const end = seatCursor + allocated - 1;
-    if (allocated > 0) seatCursor += allocated;
-    const available = r.capacity - allocated;
-    const status = allocated === 0 ? 'Unused' : available === 0 ? 'Full' : 'Partial';
-    const range = allocated > 0 ? `S${String(start).padStart(3, '0')} - S${String(end).padStart(3, '0')}` : '—';
-    return { room: r.name, capacity: r.capacity, allocated, available, range, status };
+function seatingKey(examLabel, slotIndex) {
+  return (examLabel || currentExamLabel) + '|' + slotIndex;
+}
+
+// Rooms already hosting at least one student from a DIFFERENT slot running
+// at the same actual date+time (a simultaneous, different-program exam) —
+// a real exam day splits its rooms across those exams, so a room one of them
+// has already claimed isn't available to the others. Returns a Map of
+// roomName -> the sibling slot's subject name, for messaging. Only counts
+// slots that have actually been opened/allocated at least once (lazily —
+// whichever slot claims a room first, in visit order, keeps it).
+function getRoomsBusyElsewhere(slotIndex, examLabel) {
+  const busy = new Map();
+  getSimultaneousSlotIndices(slotIndex).filter(i => i !== slotIndex).forEach(i => {
+    const map = seatingAssignments[seatingKey(examLabel, i)];
+    if (!map) return;
+    const subject = data.timetableSlots[i].subject;
+    Object.values(map).forEach(roomName => { if (!busy.has(roomName)) busy.set(roomName, subject); });
   });
+  return busy;
+}
+
+// The real students registered for this slot's subject — same roster
+// Hall Ticket draws on, filtered to whoever is actually appearing for this
+// exam code, so Manual Assignment has real names/IDs to drag and check
+// instead of a flat headcount.
+function getSeatingRoster(slot, examLabel) {
+  // registrationSubjects assigns each program its own subject list, but
+  // still by exam (not per-semester) — so a seating list built only off
+  // subjectCodes would also pull in the same program's students from other
+  // semesters (e.g. a Sem I Computer student registered for a different
+  // exam's Computer papers). Restrict to the slot's own program + semester
+  // so the room only fills with students who'd plausibly sit that exact
+  // paper. Falls back to a 'CS'-prefix guess for any slot seeded before
+  // `program` was tracked directly on the slot.
+  const subjectProgram = slot.program || (slot.code.startsWith('CS') ? 'B.E. Computer' : null);
+  const subjectSem = subjectProgram ? /Sem\s+(\S+)/.exec(examLabel || currentExamLabel)?.[1] : null;
+  return getRegistrationRoster(examLabel).filter(r =>
+    r.subjectCodes.includes(slot.code) &&
+    (!subjectProgram || r.program === subjectProgram) &&
+    (!subjectSem || r.sem === subjectSem));
+}
+
+// Fills every room in capacity order (lowest seat number first), leaving
+// whoever doesn't fit as unassigned — the same "Auto Allocate" behavior as
+// before, just against the real roster instead of a placeholder count. Rooms
+// a simultaneous, different-program exam has already claimed are skipped
+// entirely, so two exams running at the same time never get auto-allocated
+// into the same physical room.
+function autoAllocateSeating(slot, examLabel, slotIndex) {
+  const roster = getSeatingRoster(slot, examLabel);
+  const seatNumbers = computeSeatNumbers(roster, examLabel);
+  const sorted = [...roster].sort((a, b) => (seatNumbers[a.id] || '').localeCompare(seatNumbers[b.id] || '', undefined, { numeric: true }));
+  const busyRooms = slotIndex == null ? new Map() : getRoomsBusyElsewhere(slotIndex, examLabel);
+  const availableRooms = data.rooms.filter(r => !busyRooms.has(r.name));
+  const map = {};
+  let roomIdx = 0;
+  let used = 0;
+  for (const s of sorted) {
+    while (roomIdx < availableRooms.length && used >= availableRooms[roomIdx].capacity) { roomIdx++; used = 0; }
+    if (roomIdx >= availableRooms.length) break;
+    map[s.id] = availableRooms[roomIdx].name;
+    used++;
+  }
+  return map;
+}
+
+function ensureSeatingAssignment(slot, slotIndex, examLabel) {
+  const key = seatingKey(examLabel, slotIndex);
+  if (!seatingAssignments[key]) seatingAssignments[key] = autoAllocateSeating(slot, examLabel, slotIndex);
+  return seatingAssignments[key];
+}
+
+// Places as many of the given student IDs into roomName as its remaining
+// capacity allows (already-seated IDs are left alone); anyone who doesn't
+// fit is reported back as skipped rather than silently dropped. A room a
+// simultaneous, different-program exam already occupies is refused outright
+// (busyWith names that exam), the same "one room, one exam at a time" rule
+// autoAllocateSeating already enforces.
+function assignStudentsToRoom(slot, slotIndex, examLabel, studentIds, roomName) {
+  const room = data.rooms.find(r => r.name === roomName);
+  if (!room) return { placed: 0, skipped: studentIds.length };
+  const busyRooms = getRoomsBusyElsewhere(slotIndex, examLabel);
+  if (busyRooms.has(roomName)) return { placed: 0, skipped: studentIds.length, busyWith: busyRooms.get(roomName) };
+  const assignMap = ensureSeatingAssignment(slot, slotIndex, examLabel);
+  let freeSeats = room.capacity - Object.values(assignMap).filter(r => r === roomName).length;
+  let placed = 0, skipped = 0;
+  studentIds.forEach(id => {
+    if (assignMap[id] === roomName) return;
+    if (freeSeats <= 0) { skipped++; return; }
+    assignMap[id] = roomName;
+    freeSeats--;
+    placed++;
+  });
+  return { placed, skipped };
+}
+
+function unassignSeat(slot, slotIndex, examLabel, studentId) {
+  const assignMap = ensureSeatingAssignment(slot, slotIndex, examLabel);
+  delete assignMap[studentId];
+}
+
+function currentSeatingSlot() {
+  const slots = data.timetableSlots;
+  const idx = Math.min(selectedSeatingSlotIndex, slots.length - 1);
+  return { slots, idx, slot: slots[idx] };
+}
+
+// Every room's occupants (with stable, Hall-Ticket-matching seat numbers)
+// plus whoever from the roster isn't seated anywhere yet. Rooms already
+// claimed by a simultaneous, different-program exam are flagged via
+// busyWith so the UI can show them as unavailable instead of "Unused".
+function computeSeatingAllocation(slot, slotIndex, examLabel) {
+  examLabel = examLabel || currentExamLabel;
+  const roster = getSeatingRoster(slot, examLabel);
+  const seatNumbers = computeSeatNumbers(roster, examLabel);
+  const assignMap = ensureSeatingAssignment(slot, slotIndex, examLabel);
+  const busyRooms = getRoomsBusyElsewhere(slotIndex, examLabel);
+  const withSeatNo = s => ({ id: s.id, name: s.name, program: s.program, seatNo: seatNumbers[s.id] });
+  const byId = new Map(roster.map(s => [s.id, s]));
+  const rows = data.rooms.map(r => {
+    const occupants = Object.keys(assignMap)
+      .filter(id => assignMap[id] === r.name && byId.has(id))
+      .map(id => withSeatNo(byId.get(id)))
+      .sort((a, b) => (a.seatNo || '').localeCompare(b.seatNo || '', undefined, { numeric: true }));
+    const allocated = occupants.length;
+    const available = r.capacity - allocated;
+    const status = allocated === 0 ? 'Unused' : available <= 0 ? 'Full' : 'Partial';
+    return { room: r.name, capacity: r.capacity, allocated, available, occupants, status, busyWith: allocated === 0 ? (busyRooms.get(r.name) || null) : null };
+  });
+  const unassigned = roster.filter(s => !assignMap[s.id]).map(withSeatNo)
+    .sort((a, b) => (a.seatNo || '').localeCompare(b.seatNo || '', undefined, { numeric: true }));
   const totalCapacity = data.rooms.reduce((sum, r) => sum + r.capacity, 0);
-  const totalAllocated = rows.reduce((sum, r) => sum + r.allocated, 0);
-  return { subject, rows, totalCapacity, totalAllocated, overflow: Math.max(0, remaining) };
+  return { roster, rows, unassigned, totalCapacity, totalAllocated: roster.length - unassigned.length };
+}
+
+function toggleSeatingManualMode() {
+  seatingManualMode = !seatingManualMode;
+  seatingSelectedIds.clear();
+  showPage('seating');
+}
+
+function toggleSeatSelect(id) {
+  if (seatingSelectedIds.has(id)) seatingSelectedIds.delete(id); else seatingSelectedIds.add(id);
+  showPage('seating');
+}
+
+function toggleSeatSelectAll(ids, checked) {
+  ids.forEach(id => checked ? seatingSelectedIds.add(id) : seatingSelectedIds.delete(id));
+  showPage('seating');
+}
+
+// Which student ID(s) a drag gesture is carrying — the whole checked set if
+// the dragged row is part of it, otherwise just that one row.
+let seatDragIds = [];
+
+function handleSeatDragStart(e, id) {
+  seatDragIds = seatingSelectedIds.has(id) ? [...seatingSelectedIds] : [id];
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', id);
+}
+
+function seatingAssignToast(roomName, result) {
+  if (result.busyWith) return `${roomName} is already in use by ${result.busyWith} at this date/time — choose a different room.`;
+  if (result.skipped) return `${roomName} only had space for ${result.placed} — ${result.skipped} student(s) could not be seated (room full)`;
+  return `${result.placed} student(s) seated in ${roomName}`;
+}
+
+function handleSeatDrop(e, roomName) {
+  e.preventDefault();
+  if (!seatDragIds.length) return;
+  const { idx, slot } = currentSeatingSlot();
+  const result = assignStudentsToRoom(slot, idx, currentExamLabel, seatDragIds, roomName);
+  seatDragIds = [];
+  seatingSelectedIds.clear();
+  showPage('seating');
+  showToast(seatingAssignToast(roomName, result));
+}
+
+function handleSeatUnassignDrop(e) {
+  e.preventDefault();
+  if (!seatDragIds.length) return;
+  const { idx, slot } = currentSeatingSlot();
+  seatDragIds.forEach(id => unassignSeat(slot, idx, currentExamLabel, id));
+  const count = seatDragIds.length;
+  seatDragIds = [];
+  seatingSelectedIds.clear();
+  showPage('seating');
+  showToast(`${count} student(s) moved back to Unassigned`);
+}
+
+function bulkAssignSelectedToRoom(roomName) {
+  if (!roomName || seatingSelectedIds.size === 0) return;
+  const { idx, slot } = currentSeatingSlot();
+  const result = assignStudentsToRoom(slot, idx, currentExamLabel, [...seatingSelectedIds], roomName);
+  seatingSelectedIds.clear();
+  showPage('seating');
+  showToast(seatingAssignToast(roomName, result));
+}
+
+function removeSeatAssignment(studentId) {
+  const { idx, slot } = currentSeatingSlot();
+  unassignSeat(slot, idx, currentExamLabel, studentId);
+  showPage('seating');
+  showToast('Student moved back to Unassigned');
+}
+
+function viewSeatingRoomOccupants(roomName) {
+  const { idx, slot } = currentSeatingSlot();
+  const alloc = computeSeatingAllocation(slot, idx, currentExamLabel);
+  const row = alloc.rows.find(r => r.room === roomName);
+  const rows = (row ? row.occupants : []).map(o => `<tr><td>${o.seatNo}</td><td>${o.id}</td><td>${o.name}</td><td>${o.program}</td></tr>`).join('');
+  const body = `
+    <div class="table-wrap">
+      <table>
+        <tr><th>Seat No.</th><th>Student ID</th><th>Name</th><th>Program</th></tr>
+        ${rows || '<tr><td colspan="4" class="text-center text-muted" style="padding:16px">No students seated here yet.</td></tr>'}
+      </table>
+    </div>
+  `;
+  openModal(`${roomName} — Occupants`, body, `<button class="btn" onclick="closeModal()">Close</button>`);
+}
+
+function openSeatingBulkUploadModal() {
+  const body = `
+    <div class="text-center" style="padding:8px 0 16px">
+      <i class="fas fa-file-upload" style="font-size:40px;color:var(--primary)"></i>
+    </div>
+    <p class="text-muted" style="margin-bottom:12px">Upload a CSV mapping Student ID to Room (e.g. <code>S001,Lab 101</code>) to seat every currently unassigned student for this session in one go. Rooms without enough remaining capacity will skip the extra rows.</p>
+    <input type="file" id="seatingUploadFile" class="form-control" accept=".csv">
+  `;
+  const footer = `<button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="processSeatingBulkUpload()"><i class="fas fa-file-upload"></i> Upload &amp; Allocate</button>`;
+  openModal('Bulk Upload Seating', body, footer);
+}
+
+function processSeatingBulkUpload() {
+  const { idx, slot } = currentSeatingSlot();
+  const alloc = computeSeatingAllocation(slot, idx, currentExamLabel);
+  let remainingIds = alloc.unassigned.map(s => s.id);
+  let seated = 0;
+  data.rooms.forEach(r => {
+    if (!remainingIds.length) return;
+    const row = alloc.rows.find(x => x.room === r.name);
+    if (row.busyWith) return; // already claimed by a simultaneous exam
+    const free = r.capacity - row.allocated;
+    if (free <= 0) return;
+    const chunk = remainingIds.splice(0, free);
+    seated += assignStudentsToRoom(slot, idx, currentExamLabel, chunk, r.name).placed;
+  });
+  closeModal();
+  showPage('seating');
+  showToast(`Bulk upload processed — ${seated} student(s) seated from seating_upload.csv${remainingIds.length ? `, ${remainingIds.length} could not be seated (no capacity remaining)` : ''}`);
 }
 
 function renderSeating() {
-  const slots = data.timetableSlots;
-  const idx = Math.min(selectedSeatingSlotIndex, slots.length - 1);
-  const slot = slots[idx];
-  const alloc = computeSeatingAllocation(slot.code);
-  const slotOptions = slots.map((s, i) => `<option value="${i}" ${i === idx ? 'selected' : ''}>${s.date} - ${s.session}</option>`).join('');
+  const { slots, idx, slot } = currentSeatingSlot();
+  const alloc = computeSeatingAllocation(slot, idx, currentExamLabel);
+  const slotOptions = slots.map((s, i) => `<option value="${i}" ${i === idx ? 'selected' : ''}>${s.date} - ${s.session} — ${s.subject} (${s.code})</option>`).join('');
   const statusClass = { Full: 'badge-success', Partial: 'badge-warning', Unused: 'badge-neutral' };
-  const rows = alloc.rows.map(r =>
-    `<tr><td>${r.room}</td><td>${r.capacity}</td><td>${r.allocated}</td><td>${r.available}</td><td>${r.range}</td><td><span class="badge ${statusClass[r.status]}">${r.status}</span></td></tr>`
-  ).join('');
-  const overflowAlert = alloc.overflow > 0
-    ? `<div class="alert alert-warning"><i class="fas fa-exclamation-triangle"></i> ${alloc.overflow} student(s) could not be seated in the available rooms — allocate an additional room for this session.</div>`
+
+  const toolbar = `
+    <div class="filter-bar">
+      <select class="form-control" onchange="changeSeatingSlot(this.value)">${slotOptions}</select>
+      <select class="form-control" disabled><option>${slot.subject} (${slot.code})</option></select>
+      <span class="chip"><i class="fas fa-user-graduate"></i> ${alloc.roster.length} Appearing</span>
+      <button class="btn btn-sm ${seatingManualMode ? 'btn-primary' : ''}" onclick="toggleSeatingManualMode()"><i class="fas fa-hand-pointer"></i> ${seatingManualMode ? 'Exit Manual Mode' : 'Manual Assignment'}</button>
+      <button class="btn btn-sm" onclick="openSeatingBulkUploadModal()"><i class="fas fa-file-upload"></i> Bulk Upload</button>
+      <button class="btn btn-primary btn-sm" onclick="showActionModal('Auto Allocate Seats','Re-run automatic seat allocation for ${alloc.roster.length} appearing students (${slot.date} - ${slot.session}, ${slot.subject}) across available rooms by capacity. Any manual changes made for this session will be overwritten. Rooms already claimed by another exam running at the same date/time are skipped.', {icon:'fa-magic', confirmLabel:'Allocate', confirmIcon:'fa-magic', onConfirm:()=>{ seatingAssignments[seatingKey(currentExamLabel, ${idx})] = autoAllocateSeating(data.timetableSlots[${idx}], currentExamLabel, ${idx}); showPage('seating'); }})"><i class="fas fa-magic"></i> Auto Allocate</button>
+      <button class="btn btn-sm" style="margin-left:auto" onclick="showActionModal('Export Seating Chart','The room-wise seating chart and student-wise seat numbers for ${slot.date} - ${slot.session} (${slot.subject}) have been exported.', {icon:'fa-file-pdf', confirmLabel:'Download PDF', confirmIcon:'fa-download'})"><i class="fas fa-file-pdf"></i> Export Seating Chart</button>
+    </div>
+  `;
+
+  const overflowAlert = alloc.unassigned.length > 0
+    ? `<div class="alert alert-warning"><i class="fas fa-exclamation-triangle"></i> ${alloc.unassigned.length} student(s) are currently unassigned. ${seatingManualMode ? 'Drag them onto a room below, or check them and use Move Selected.' : 'Switch to Manual Assignment to seat them, or use Auto Allocate.'}</div>`
     : '';
+
+  if (!seatingManualMode) {
+    const rows = alloc.rows.map(r => `<tr>
+        <td>${r.room}</td><td>${r.capacity}</td><td>${r.allocated}</td><td>${r.available}</td>
+        <td>${r.occupants.length ? `<button class="btn btn-sm" onclick="viewSeatingRoomOccupants('${r.room.replace(/'/g, "\\'")}')"><i class="fas fa-list"></i> View ${r.occupants.length}</button>` : '<span class="text-muted">—</span>'}</td>
+        <td>${r.busyWith ? `<span class="badge badge-neutral" title="Claimed by another exam at this date/time"><i class="fas fa-lock"></i> In Use — ${r.busyWith}</span>` : `<span class="badge ${statusClass[r.status]}">${r.status}</span>`}</td>
+      </tr>`).join('');
+    return `
+      <div class="page-content">
+        <div class="alert alert-info"><i class="fas fa-info-circle"></i> Allocate rooms and seats for each exam date and session.</div>
+        ${toolbar}
+        ${overflowAlert}
+        <div class="card">
+          <div class="card-header"><h3><i class="fas fa-chair"></i> Room Allocation — ${slot.subject} (${slot.date} - ${slot.session})</h3><div class="flex gap-2" style="align-items:center"><input type="text" class="form-control" style="max-width:200px" placeholder="Search rooms..." oninput="liveSearchTable(this)"><span class="text-muted">${alloc.totalAllocated} / ${alloc.totalCapacity} seats used</span></div></div>
+          <div class="card-body">
+            <div class="table-wrap">
+              <table>
+                <tr><th>Room</th><th>Capacity</th><th>Allocated</th><th>Available Seats</th><th>Seat Numbers</th><th>Status</th></tr>
+                ${rows}
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  const initials = name => name.trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
+  const seatCard = (s, { checkbox, removeBtn } = {}) => `
+      <div class="seat-card${seatingSelectedIds.has(s.id) ? ' selected' : ''}" draggable="true" ondragstart="handleSeatDragStart(event,'${s.id}')">
+        <i class="fas fa-grip-vertical seat-drag-handle"></i>
+        ${checkbox ? `<input type="checkbox" onclick="event.stopPropagation();toggleSeatSelect('${s.id}')" ${seatingSelectedIds.has(s.id) ? 'checked' : ''}>` : ''}
+        <div class="seat-avatar">${initials(s.name)}</div>
+        <div class="seat-info">
+          <div class="seat-name">${s.name}</div>
+          <div class="seat-meta">${s.id} · ${s.seatNo}</div>
+        </div>
+        ${removeBtn ? `<button class="seat-remove" title="Unassign" onclick="removeSeatAssignment('${s.id}')"><i class="fas fa-times"></i></button>` : ''}
+      </div>
+    `;
+
+  const allChecked = alloc.unassigned.length > 0 && alloc.unassigned.every(s => seatingSelectedIds.has(s.id));
+  const unassignedRows = alloc.unassigned.map(s => seatCard(s, { checkbox: true })).join('')
+    || `<div class="seat-room-empty"><i class="fas fa-check-circle"></i>Everyone is seated</div>`;
+
+  const roomCards = data.rooms.map(r => {
+    const row = alloc.rows.find(x => x.room === r.name);
+    const isBusyElsewhere = !!row.busyWith;
+    const pct = Math.round((row.allocated / row.capacity) * 100);
+    const occupantRows = row.occupants.map(o => seatCard(o, { removeBtn: true })).join('')
+      || (isBusyElsewhere
+        ? `<div class="seat-room-empty"><i class="fas fa-lock"></i>In use by ${row.busyWith}</div>`
+        : `<div class="seat-room-empty"><i class="fas fa-arrow-down"></i>Drop students here</div>`);
+    const dropAttrs = isBusyElsewhere ? '' : `ondragover="event.preventDefault()" ondragenter="this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="this.classList.remove('drag-over');handleSeatDrop(event,'${r.name.replace(/'/g, "\\'")}')"`;
+    return `
+      <div class="seat-room${isBusyElsewhere ? ' seat-room-busy' : ''}" data-status="${row.status}" ${dropAttrs}>
+        <div class="seat-room-header">
+          <div class="seat-room-name"><i class="fas fa-door-open"></i> ${r.name}</div>
+          <span class="seat-room-count">${isBusyElsewhere ? 'In Use' : `${row.allocated}/${row.capacity}`}</span>
+        </div>
+        <div class="seat-room-bar"><div class="seat-room-bar-fill" style="width:${isBusyElsewhere ? 100 : pct}%"></div></div>
+        <div class="seat-room-body">${occupantRows}</div>
+      </div>
+    `;
+  }).join('');
+
+  const selectableRooms = data.rooms.filter(r => !alloc.rows.find(x => x.room === r.name).busyWith);
+
   return `
     <div class="page-content">
-      <div class="alert alert-info"><i class="fas fa-info-circle"></i> Allocate rooms and seats for each exam date and session.</div>
-      <div class="filter-bar">
-        <select class="form-control" onchange="changeSeatingSlot(this.value)">${slotOptions}</select>
-        <select class="form-control" disabled><option>${alloc.subject.name} (${alloc.subject.code})</option></select>
-        <span class="chip"><i class="fas fa-user-graduate"></i> ${alloc.subject.verifiedSheets} Appearing</span>
-        <button class="btn btn-primary btn-sm" onclick="showActionModal('Auto Allocate Seats','Automatically allocate seats for ${alloc.subject.verifiedSheets} appearing students (${slot.date} - ${slot.session}, ${alloc.subject.name}) across available rooms based on capacity.', {icon:'fa-magic', confirmLabel:'Allocate', confirmIcon:'fa-magic', onConfirm:()=>showPage('seating')})"><i class="fas fa-magic"></i> Auto Allocate</button>
-        <button class="btn btn-sm" style="margin-left:auto" onclick="showActionModal('Export Seating Chart','The room-wise seating chart and student-wise seat numbers for ${slot.date} - ${slot.session} (${alloc.subject.name}) have been exported.', {icon:'fa-file-pdf', confirmLabel:'Download PDF', confirmIcon:'fa-download'})"><i class="fas fa-file-pdf"></i> Export Seating Chart</button>
-      </div>
+      <div class="alert alert-info"><i class="fas fa-info-circle"></i> Manual mode: drag a student onto a room, or check several and use Move Selected. Drag out of a room and onto Unassigned to undo.</div>
+      ${toolbar}
       ${overflowAlert}
-      <div class="card">
-        <div class="card-header"><h3><i class="fas fa-chair"></i> Room Allocation — ${alloc.subject.name} (${slot.date} - ${slot.session})</h3><span class="text-muted">${alloc.totalAllocated} / ${alloc.totalCapacity} seats used</span></div>
-        <div class="card-body">
-          <div class="table-wrap">
-            <table>
-              <tr><th>Room</th><th>Capacity</th><th>Allocated</th><th>Available Seats</th><th>Students</th><th></th></tr>
-              ${rows}
-            </table>
+      <div class="seating-toolbar-row">
+        <div class="seating-selected-chip${seatingSelectedIds.size ? ' active' : ''}"><i class="fas fa-check-square"></i> ${seatingSelectedIds.size} selected</div>
+        <select class="form-control" id="bulkAssignRoomSelect"><option value="">Move selected to room...</option>${selectableRooms.map(r => `<option value="${r.name}">${r.name}</option>`).join('')}</select>
+        <button class="btn btn-sm btn-primary" onclick="bulkAssignSelectedToRoom(document.getElementById('bulkAssignRoomSelect').value)"><i class="fas fa-arrow-right"></i> Move Selected</button>
+      </div>
+      <div class="seating-manual-grid">
+        <div class="card seat-unassigned-panel" ondragover="event.preventDefault()" ondragenter="this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="this.classList.remove('drag-over');handleSeatUnassignDrop(event)">
+          <div class="card-header"><h3><i class="fas fa-user-graduate"></i> Unassigned (${alloc.unassigned.length})</h3>
+            <label class="seat-select-all"><input type="checkbox" ${allChecked ? 'checked' : ''} onclick="toggleSeatSelectAll(${JSON.stringify(alloc.unassigned.map(s => s.id))}, this.checked)"> Select all</label>
           </div>
+          <div class="card-body">
+            <div class="seat-unassigned-body">
+              ${unassignedRows}
+            </div>
+          </div>
+        </div>
+        <div class="seating-room-grid">
+          ${roomCards}
         </div>
       </div>
     </div>
   `;
 }
 
+// Every timetable slot index that runs at the same actual date+time as the
+// given one — since a real exam day schedules many programs' papers side by
+// side, several slot indices can share a date/session while genuinely
+// overlapping in time. Seating and Invigilator both use this so "one room,
+// one exam at a time" and "one invigilator, one room at a time" hold across
+// those simultaneous slots, not just within a single slot index.
+function getSimultaneousSlotIndices(slotIndex) {
+  const slots = data.timetableSlots;
+  const target = slots[slotIndex];
+  if (!target) return [slotIndex];
+  const targetRange = parseSlotTimeRange(target.time);
+  return slots.reduce((acc, s, i) => {
+    if (s.date !== target.date) return acc;
+    if (i === slotIndex) { acc.push(i); return acc; }
+    const range = parseSlotTimeRange(s.time);
+    if ([targetRange.start, targetRange.end, range.start, range.end].some(Number.isNaN)) return acc;
+    if (targetRange.start < range.end && range.start < targetRange.end) acc.push(i);
+    return acc;
+  }, []);
+}
+
 // ============================================================
 // INVIGILATOR
 // ============================================================
 let selectedInvigilatorSlotIndex = 0;
+// Which room Status the duty chart table is narrowed to ('' = all).
+let invigilatorStatusFilter = '';
 // Keyed by exam-slot index, so each date/session keeps its own independent
 // set of room assignments instead of one shared static table.
 const invigilatorDuty = {};
@@ -1212,12 +1850,14 @@ function getInvigilatorAssignments(slotIndex) {
   if (!invigilatorDuty[slotIndex]) {
     const unassignedRoomIdx = data.rooms.length - 1;
     const pendingRoomIdx = data.rooms.length - 2;
+    // Each room holds a *list* of faculty (facultyIds) rather than one, so a
+    // large hall can get a primary invigilator plus a backup/second.
     invigilatorDuty[slotIndex] = data.rooms.map((r, i) => {
       if (i === unassignedRoomIdx) {
-        return { room: r.name, facultyId: null, status: 'Not Assigned' };
+        return { room: r.name, facultyIds: [], status: 'Not Assigned' };
       }
       const faculty = data.faculty[(i + slotIndex) % data.faculty.length];
-      return { room: r.name, facultyId: faculty.id, status: i === pendingRoomIdx ? 'Pending' : 'Confirmed' };
+      return { room: r.name, facultyIds: [faculty.id], status: i === pendingRoomIdx ? 'Pending' : 'Confirmed' };
     });
   }
   return invigilatorDuty[slotIndex];
@@ -1229,70 +1869,150 @@ function findFaculty(facultyId) {
 
 function changeInvigilatorSlot(value) {
   selectedInvigilatorSlotIndex = Number(value);
+  invigilatorStatusFilter = '';
   showPage('invigilator');
 }
 
-function unassignInvigilator(slotIndex, room) {
+function filterInvigilatorStatus(value) {
+  invigilatorStatusFilter = value;
+  showPage('invigilator');
+}
+
+function unassignInvigilator(slotIndex, room, facultyId) {
   const assignments = getInvigilatorAssignments(slotIndex);
   const a = assignments.find(x => x.room === room);
   if (!a) return;
-  const faculty = findFaculty(a.facultyId);
+  const faculty = findFaculty(facultyId);
   showActionModal('Unassign Invigilator', `Remove ${faculty ? faculty.name : 'this invigilator'} from ${room} duty for this session?`, {
     icon: 'fa-user-minus', iconColor: 'var(--danger)', confirmLabel: 'Unassign', confirmClass: 'btn-danger', confirmIcon: 'fa-user-minus',
     onConfirm: function () {
-      a.facultyId = null;
-      a.status = 'Not Assigned';
+      a.facultyIds = a.facultyIds.filter(id => id !== facultyId);
+      if (a.facultyIds.length === 0) a.status = 'Not Assigned';
       showPage('invigilator');
-      showToast(room + ' is now unassigned');
+      showToast((faculty ? faculty.name : 'Invigilator') + ' removed from ' + room);
     }
   });
+}
+
+// Stashed so the Room dropdown's onchange (a global handler, since it's
+// wired up via an inline HTML attribute) can look up who's currently in
+// whichever room was just selected.
+let assignInvigilatorModalAssignments = null;
+
+function updateAssignInvigilatorRoomInfo() {
+  const room = document.getElementById('assignInvigilatorRoom').value;
+  const infoEl = document.getElementById('assignInvigilatorRoomInfo');
+  if (!infoEl || !assignInvigilatorModalAssignments) return;
+  const a = assignInvigilatorModalAssignments.find(x => x.room === room);
+  const names = a && a.facultyIds.length ? a.facultyIds.map(fid => findFaculty(fid).name).join(', ') : 'No one yet';
+  infoEl.textContent = `Currently in ${room}: ${names}`;
+}
+
+// Every room assignment across every timetable slot that runs at the same
+// actual date+time as slotIndex — a real exam day schedules several
+// programs' papers side by side, each tracked as its own slot index, but a
+// faculty member obviously can't invigilate two of them simultaneously just
+// because they're different subjects. Each entry is tagged with which slot/
+// subject it belongs to, so a room name alone doesn't have to carry that
+// context.
+function getSimultaneousInvigilatorAssignments(slotIndex) {
+  return getSimultaneousSlotIndices(slotIndex).flatMap(i =>
+    getInvigilatorAssignments(i).map(a => ({ ...a, slotIndex: i, subject: data.timetableSlots[i].subject }))
+  );
 }
 
 function openAssignInvigilatorModal(slotIndex, prefilledRoom) {
   const assignments = getInvigilatorAssignments(slotIndex);
-  const openRooms = assignments.filter(a => !a.facultyId);
-  if (openRooms.length === 0) {
-    showToast('All rooms for this session already have an invigilator assigned');
-    return;
-  }
+  assignInvigilatorModalAssignments = assignments;
+  const allAssignments = getSimultaneousInvigilatorAssignments(slotIndex);
+  // A room can hold several invigilators (primary + backup for a large
+  // hall), but one invigilator can only ever be in one room per session —
+  // so the Room dropdown lists every room, while the Faculty list below
+  // shows (and disables) anyone already committed elsewhere this session,
+  // whether that's another room in this same exam or a different program's
+  // exam running at the same time.
+  const summaryLines = assignments.filter(a => a.facultyIds.length).map(a => `<strong>${a.room}:</strong> ${a.facultyIds.map(fid => findFaculty(fid).name).join(', ')}`);
+  const summaryBox = summaryLines.length
+    ? `<div class="alert alert-info" style="margin-bottom:12px">Currently assigned this session:<br>${summaryLines.join('<br>')}</div>`
+    : '';
+  const initialRoom = (prefilledRoom && assignments.some(a => a.room === prefilledRoom)) ? prefilledRoom : assignments[0].room;
+  const initialRoomAssignment = assignments.find(a => a.room === initialRoom);
+  const initialRoomNames = initialRoomAssignment && initialRoomAssignment.facultyIds.length
+    ? initialRoomAssignment.facultyIds.map(fid => findFaculty(fid).name).join(', ')
+    : 'No one yet';
   openFormModal('Assign Invigilator', `
+    ${summaryBox}
     <div class="form-group"><label>Room</label>
-      <select class="form-control" id="assignInvigilatorRoom">
-        ${openRooms.map(a => `<option value="${a.room}" ${a.room === prefilledRoom ? 'selected' : ''}>${a.room}</option>`).join('')}
+      <select class="form-control" id="assignInvigilatorRoom" onchange="updateAssignInvigilatorRoomInfo()">
+        ${assignments.map(a => `<option value="${a.room}" ${a.room === prefilledRoom ? 'selected' : ''}>${a.room}${a.facultyIds.length ? ` (${a.facultyIds.length} assigned)` : ''}</option>`).join('')}
       </select>
+      <div id="assignInvigilatorRoomInfo" class="text-muted" style="font-size:12px;margin-top:4px">Currently in ${initialRoom}: ${initialRoomNames}</div>
     </div>
-    <div class="form-group"><label>Faculty</label>
-      <select class="form-control" id="assignInvigilatorFaculty">
-        ${data.faculty.map(f => `<option value="${f.id}">${f.name} (${f.id})</option>`).join('')}
-      </select>
+    <div class="form-group"><label>Faculty <span class="text-muted" style="font-weight:400">(check as many as needed — greyed out means already assigned elsewhere at this date/time)</span></label>
+      <div style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:8px 12px">
+        ${data.faculty.map(f => {
+          const busyElsewhere = allAssignments.filter(a => a.facultyIds.includes(f.id));
+          const isBusy = busyElsewhere.length > 0;
+          const busyLabel = busyElsewhere.map(a => a.slotIndex === slotIndex ? a.room : `${a.room} — ${a.subject}`).join(', ');
+          return `
+          <label style="display:flex;align-items:center;gap:8px;padding:6px 0;${isBusy ? 'cursor:not-allowed;opacity:.55' : 'cursor:pointer'}">
+            <input type="checkbox" class="assign-invigilator-faculty-cb" value="${f.id}" ${isBusy ? 'disabled' : ''}>
+            <span>${f.name} (${f.id})${isBusy ? ` <span class="text-muted">— already in ${busyLabel}</span>` : ''}</span>
+          </label>`;
+        }).join('')}
+      </div>
     </div>
   `, 'Assign', function () {
     const room = document.getElementById('assignInvigilatorRoom').value;
-    const facultyId = document.getElementById('assignInvigilatorFaculty').value;
-    const clash = assignments.find(a => a.facultyId === facultyId);
-    if (clash) {
-      closeModal();
-      showToast(findFaculty(facultyId).name + ' is already assigned to ' + clash.room + ' for this session — choose a different faculty member');
+    const facultyIds = Array.from(document.querySelectorAll('.assign-invigilator-faculty-cb:checked')).map(cb => cb.value);
+    if (facultyIds.length === 0) {
+      showToast('Select at least one faculty member');
       return;
     }
     const a = assignments.find(x => x.room === room);
-    if (a) { a.facultyId = facultyId; a.status = 'Confirmed'; }
+    const added = [];
+    const skipped = [];
+    facultyIds.forEach(facultyId => {
+      if (a && a.facultyIds.includes(facultyId)) {
+        skipped.push(`${findFaculty(facultyId).name} (already in ${room})`);
+        return;
+      }
+      // One invigilator can only be in one room at a time — checkboxes for
+      // anyone already elsewhere (this exam or a simultaneous one) are
+      // disabled, but re-check here too in case assignments changed since
+      // the modal opened.
+      const clash = allAssignments.find(x => !(x.slotIndex === slotIndex && x.room === room) && x.facultyIds.includes(facultyId));
+      if (clash) {
+        skipped.push(`${findFaculty(facultyId).name} (already in ${clash.room}${clash.slotIndex !== slotIndex ? ` — ${clash.subject}` : ''})`);
+        return;
+      }
+      if (a) {
+        a.facultyIds.push(facultyId);
+        added.push(findFaculty(facultyId).name);
+      }
+    });
+    if (a && added.length && a.status === 'Not Assigned') a.status = 'Confirmed';
     closeModal();
     showPage('invigilator');
-    showToast(findFaculty(facultyId).name + ' assigned to ' + room);
+    if (added.length) {
+      showToast(`${added.join(', ')} assigned to ${room}` + (skipped.length ? ` — skipped: ${skipped.join(', ')}` : ''));
+    } else {
+      showToast(`No one assigned — skipped: ${skipped.join(', ')}`);
+    }
   });
 }
 
 function validateInvigilatorConflicts(slotIndex) {
-  const assignments = getInvigilatorAssignments(slotIndex);
+  const allAssignments = getSimultaneousInvigilatorAssignments(slotIndex);
   const byFaculty = {};
-  assignments.forEach(a => {
-    if (!a.facultyId) return;
-    (byFaculty[a.facultyId] = byFaculty[a.facultyId] || []).push(a.room);
+  allAssignments.forEach(a => {
+    a.facultyIds.forEach(fid => {
+      (byFaculty[fid] = byFaculty[fid] || []).push(a.slotIndex === slotIndex ? a.room : `${a.room} (${a.subject})`);
+    });
   });
   const conflicts = Object.entries(byFaculty).filter(([, rooms]) => rooms.length > 1);
   if (conflicts.length === 0) {
-    showActionModal('Validate Conflicts', 'Checked all invigilator assignments for this session — no faculty member is assigned to more than one room at the same time.', {
+    showActionModal('Validate Conflicts', 'Checked all invigilator assignments across every exam running at this date/time — no faculty member is assigned to more than one room at once.', {
       icon: 'fa-check-circle', iconColor: 'var(--success)', showCancel: false, confirmLabel: 'OK'
     });
   } else {
@@ -1330,6 +2050,10 @@ function renderInvigilator() {
   const slotLabel = `${slot.date} - ${slot.session}`;
   const assignments = getInvigilatorAssignments(idx);
   const slotOptions = slots.map((s, i) => `<option value="${i}" ${i === idx ? 'selected' : ''}>${s.date} - ${s.session}</option>`).join('');
+  // Each slot in this fixed timetable is exactly one subject, so a Subject
+  // dropdown is just another way to jump to the same slot index — handy
+  // once you know the paper but not the date offhand.
+  const subjectOptions = slots.map((s, i) => `<option value="${i}" ${i === idx ? 'selected' : ''}>${s.subject} (${s.code})</option>`).join('');
   const statusClass = { Confirmed: 'badge-success', Pending: 'badge-warning', 'Not Assigned': 'badge-danger' };
 
   // The Invigilator login is one shared generic account, not tied to a
@@ -1340,21 +2064,24 @@ function renderInvigilator() {
   const myFacultyId = 'F01';
 
   const statusAccent = { Confirmed: 'var(--success)', Pending: 'var(--warning)', 'Not Assigned': 'var(--danger)' };
-  const rows = assignments.map(a => {
-    const faculty = findFaculty(a.facultyId);
-    const isMine = isInvigilatorRole && a.facultyId === myFacultyId;
+  const displayAssignments = invigilatorStatusFilter ? assignments.filter(a => a.status === invigilatorStatusFilter) : assignments;
+  const rows = displayAssignments.map(a => {
+    const isMine = isInvigilatorRole && a.facultyIds.includes(myFacultyId);
+    const invigilatorCell = a.facultyIds.length
+      ? a.facultyIds.map(fid => {
+          const faculty = findFaculty(fid);
+          if (!faculty) return '';
+          const initials = faculty.name.replace(/^(Dr\.|Prof\.)\s*/, '').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+          const removeBtn = isInvigilatorRole ? '' : `<button class="btn btn-sm btn-danger" onclick="unassignInvigilator(${idx}, '${a.room}', '${fid}')" title="Unassign"><i class="fas fa-times"></i></button>`;
+          return `<div class="flex-center" style="margin-bottom:4px;gap:8px"><div style="width:28px;height:28px;border-radius:50%;background:var(--primary-light);color:var(--primary);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">${initials}</div><span>${faculty.name}</span>${removeBtn}</div>`;
+        }).join('')
+      : `<span class="text-muted">— Unassigned —</span>`;
+    const contactCell = a.facultyIds.length
+      ? a.facultyIds.map(fid => `<span class="badge badge-neutral" style="margin-bottom:4px"><i class="fas fa-id-badge"></i> ${fid}</span>`).join('<br>')
+      : `<span class="text-muted">—</span>`;
     const action = isInvigilatorRole
       ? (isMine ? `<span class="badge badge-info">You</span>` : '')
-      : (a.facultyId
-        ? `<button class="btn btn-sm btn-danger" onclick="unassignInvigilator(${idx}, '${a.room}')">Unassign</button>`
-        : `<button class="btn btn-sm btn-primary" onclick="openAssignInvigilatorModal(${idx}, '${a.room}')">Assign</button>`);
-    const initials = faculty ? faculty.name.replace(/^(Dr\.|Prof\.)\s*/, '').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() : '';
-    const invigilatorCell = faculty
-      ? `<div class="flex-center"><div style="width:28px;height:28px;border-radius:50%;background:var(--primary-light);color:var(--primary);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">${initials}</div><span>${faculty.name}</span></div>`
-      : `<span class="text-muted">— Unassigned —</span>`;
-    const contactCell = faculty
-      ? `<span class="badge badge-neutral"><i class="fas fa-id-badge"></i> ${faculty.id}</span>`
-      : `<span class="text-muted">—</span>`;
+      : `<button class="btn btn-sm btn-primary" onclick="openAssignInvigilatorModal(${idx}, '${a.room}')"><i class="fas fa-plus"></i> Add</button>`;
     return `<tr${isMine ? ' style="background:var(--primary-light)"' : ''}>
       <td style="border-left:3px solid ${statusAccent[a.status]};font-weight:600">${a.room}</td>
       <td>${slot.subject}</td>
@@ -1364,7 +2091,7 @@ function renderInvigilator() {
       <td>${action}</td>
     </tr>`;
   }).join('');
-  const unassignedCount = assignments.filter(a => !a.facultyId).length;
+  const unassignedCount = assignments.filter(a => a.facultyIds.length === 0).length;
   const pendingCount = assignments.filter(a => a.status === 'Pending').length;
   const confirmedCount = assignments.filter(a => a.status === 'Confirmed').length;
   const modeAlert = isInvigilatorRole
@@ -1372,27 +2099,34 @@ function renderInvigilator() {
     : 'Assign faculty members to examination rooms. System checks for conflicts.';
   const actionButtons = isInvigilatorRole
     ? ''
-    : `<button class="btn btn-primary btn-sm" onclick="openAssignInvigilatorModal(${idx})" ${unassignedCount ? '' : 'disabled title="All rooms already have an invigilator assigned"'}><i class="fas fa-plus"></i> Assign</button>
+    : `<button class="btn btn-primary btn-sm" onclick="openAssignInvigilatorModal(${idx})"><i class="fas fa-plus"></i> Assign</button>
         <button class="btn btn-sm" style="margin-left:auto" onclick="validateInvigilatorConflicts(${idx})"><i class="fas fa-check"></i> Validate Conflicts</button>
         <button class="btn btn-sm" onclick="publishInvigilatorDutyChart(${idx}, '${slotLabel}')"><i class="fas fa-file-pdf"></i> Publish Duty Chart</button>`;
+  const statusFilterSelect = `<select class="form-control" onchange="filterInvigilatorStatus(this.value)">
+    <option value="">All Statuses</option>
+    <option value="Confirmed" ${invigilatorStatusFilter === 'Confirmed' ? 'selected' : ''}>Confirmed</option>
+    <option value="Pending" ${invigilatorStatusFilter === 'Pending' ? 'selected' : ''}>Pending</option>
+    <option value="Not Assigned" ${invigilatorStatusFilter === 'Not Assigned' ? 'selected' : ''}>Not Assigned</option>
+  </select>`;
   return `
     <div class="page-content">
       <div class="alert alert-info"><i class="fas fa-info-circle"></i> ${modeAlert}</div>
       <div class="filter-bar">
         <select class="form-control" onchange="changeInvigilatorSlot(this.value)">${slotOptions}</select>
-        <span class="chip"><i class="fas fa-book"></i> ${slot.subject}</span>
+        <select class="form-control" onchange="changeInvigilatorSlot(this.value)">${subjectOptions}</select>
+        ${statusFilterSelect}
         <span class="chip"><i class="fas fa-check-circle" style="color:#059669"></i> ${confirmedCount} Confirmed</span>
         ${pendingCount ? `<span class="chip"><i class="fas fa-clock" style="color:#d97706"></i> ${pendingCount} Pending</span>` : ''}
         ${unassignedCount ? `<span class="chip"><i class="fas fa-exclamation-circle" style="color:#dc2626"></i> ${unassignedCount} Unassigned</span>` : ''}
         ${actionButtons}
       </div>
       <div class="card">
-        <div class="card-header"><h3><i class="fas fa-chalkboard-teacher"></i> Invigilator Duty Chart — ${slotLabel}</h3><span class="text-muted">${assignments.length - unassignedCount} / ${assignments.length} rooms assigned</span></div>
+        <div class="card-header"><h3><i class="fas fa-chalkboard-teacher"></i> Invigilator Duty Chart — ${slotLabel}</h3><div class="flex gap-2" style="align-items:center"><input type="text" class="form-control" style="max-width:200px" placeholder="Search rooms/faculty..." oninput="liveSearchTable(this)"><span class="text-muted">${assignments.length - unassignedCount} / ${assignments.length} rooms assigned</span></div></div>
         <div class="card-body">
           <div class="table-wrap">
             <table>
               <tr><th>Room</th><th>Subject</th><th>Invigilator</th><th>Contact</th><th>Status</th><th></th></tr>
-              ${rows}
+              ${rows || '<tr><td colspan="6" class="text-center text-muted" style="padding:20px">No rooms match this Status filter.</td></tr>'}
             </table>
           </div>
         </div>

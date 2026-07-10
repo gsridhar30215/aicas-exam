@@ -44,6 +44,24 @@ function updateModeBadge() {
 
 function toggleSection(el) { el.classList.toggle('open'); }
 
+// Generic live search for any rendered table: filters data rows to those
+// whose visible text matches the query (case-insensitive, matches any
+// column), hiding the rest — no re-render, so typing never resets other
+// filters/dropdowns on the page or steals focus from the input. Header rows
+// (containing <th>) are always left visible. Attach with
+// oninput="liveSearchTable(this)" on a text input placed inside the same
+// .card as the table; pass a tableId as the second argument on the rare page
+// that has more than one table in a card.
+function liveSearchTable(inputEl, tableId) {
+  const table = tableId ? document.getElementById(tableId) : inputEl.closest('.card').querySelector('table');
+  if (!table) return;
+  const query = inputEl.value.trim().toLowerCase();
+  Array.from(table.rows).forEach(row => {
+    if (row.querySelector('th')) return;
+    row.style.display = (!query || row.textContent.toLowerCase().includes(query)) ? '' : 'none';
+  });
+}
+
 function showPage(page) {
   currentPage = page;
   try { localStorage.setItem('examDemoCurrentPage', page); } catch (e) {}

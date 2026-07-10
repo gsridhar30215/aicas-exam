@@ -29,12 +29,25 @@ const data = {
     { code: 'CS405', name: 'Software Engineering', credits: 3, verifiedSheets: 219 },
     { code: 'CS406', name: 'Mathematics IV', credits: 3, verifiedSheets: 205 },
   ],
+  // Declared public holidays, checked against scheduled exam dates by the
+  // Timetable page's Holiday Validation. Dates use the same "DD Mon YYYY"
+  // display format as every other date in this app.
+  holidays: ['26 Jan 2026', '04 Mar 2026', '15 Aug 2026', '02 Oct 2026', '08 Nov 2026'],
   rooms: [
     { name: 'Lab 101', capacity: 30 },
     { name: 'Lab 102', capacity: 30 },
     { name: 'Lecture Hall A', capacity: 60 },
     { name: 'Lecture Hall B', capacity: 60 },
     { name: 'Seminar Hall', capacity: 80 },
+    // 3 new rooms, kept at 8 total (not 9) so it stays in step with the 8
+    // faculty below: getInvigilatorAssignments' default seed relies on
+    // rooms.length - 1 assignable rooms mapping onto faculty.length via
+    // modulo — mismatched counts would auto-assign the same faculty to two
+    // rooms by default, which is exactly what the one-room-per-invigilator
+    // rule is supposed to prevent.
+    { name: 'Lab 103', capacity: 30 },
+    { name: 'Lecture Hall C', capacity: 60 },
+    { name: 'Conference Hall', capacity: 40 },
   ],
   faculty: [
     { id: 'F01', name: 'Dr. Meena Iyer', dept: 'Computer' },
@@ -42,6 +55,16 @@ const data = {
     { id: 'F03', name: 'Dr. Sunita Rao', dept: 'Computer' },
     { id: 'F04', name: 'Prof. Rajesh Pillai', dept: 'Computer' },
     { id: 'F05', name: 'Dr. Neha Shah', dept: 'Computer' },
+    // Extra faculty beyond what the rooms need each session, so a room can
+    // actually get a genuine second/backup invigilator without it being a
+    // double-booking (see the rooms list above for why this count matters).
+    { id: 'F06', name: 'Dr. Anil Deshpande', dept: 'Computer' },
+    { id: 'F07', name: 'Prof. Kavita Menon', dept: 'Computer' },
+    { id: 'F08', name: 'Dr. Farah Sheikh', dept: 'Computer' },
+    { id: 'F09', name: 'Prof. Vikas Chandran', dept: 'Computer' },
+    { id: 'F10', name: 'Dr. Ritu Bhatnagar', dept: 'Computer' },
+    { id: 'F11', name: 'Prof. Sameer Joshi', dept: 'Computer' },
+    { id: 'F12', name: 'Dr. Lakshmi Narayan', dept: 'Computer' },
   ],
   // Mutable lists — "create" actions push into these so new items actually
   // show up in their tables, instead of just popping a confirmation.
@@ -49,13 +72,44 @@ const data = {
     { date: '10 Apr 2026', student: 'Rohit Joshi (S007)', subject: 'DS & Algorithms', type: 'Malpractice', typeClass: 'badge-danger', remarks: 'Cellular phone found', status: 'Under Review', statusClass: 'badge-warning' },
     { date: '12 Apr 2026', student: 'Ananya Gupta (S006)', subject: 'DBMS', type: 'Blank Booklet', typeClass: 'badge-warning', remarks: 'Student reported blank pages', status: 'Resolved', statusClass: 'badge-info' },
   ],
+  // A real exam day runs many programs' papers side by side (different
+  // rooms, same date/session) — B.E. Computer's own 6 papers keep their
+  // original dates/times below, and the Mechanical/Civil/Electrical/
+  // Electronics papers scheduled alongside them (same date+time, so they're
+  // genuinely simultaneous) are appended right after. Every slot is tagged
+  // with `program` so Add Slot's overlap check, Seating, and Invigilator can
+  // all tell which exams share students/rooms vs. which just share a date.
   timetableSlots: [
-    { date: '10 Apr 2026', session: 'Morning', subject: 'Data Structures & Algorithms', code: 'CS401', time: '10:00 - 13:00', duration: '3 hrs' },
-    { date: '12 Apr 2026', session: 'Morning', subject: 'Database Management Systems', code: 'CS402', time: '10:00 - 13:00', duration: '3 hrs' },
-    { date: '14 Apr 2026', session: 'Morning', subject: 'Operating Systems', code: 'CS403', time: '10:00 - 12:00', duration: '2 hrs' },
-    { date: '16 Apr 2026', session: 'Morning', subject: 'Computer Networks', code: 'CS404', time: '10:00 - 12:00', duration: '2 hrs' },
-    { date: '18 Apr 2026', session: 'Morning', subject: 'Software Engineering', code: 'CS405', time: '10:00 - 12:00', duration: '2 hrs' },
-    { date: '20 Apr 2026', session: 'Morning', subject: 'Mathematics IV', code: 'CS406', time: '10:00 - 13:00', duration: '3 hrs' },
+    { date: '10 Apr 2026', session: 'Morning', subject: 'Data Structures & Algorithms', code: 'CS401', time: '10:00 - 13:00', duration: '3 hrs', program: 'B.E. Computer' },
+    { date: '12 Apr 2026', session: 'Morning', subject: 'Database Management Systems', code: 'CS402', time: '10:00 - 13:00', duration: '3 hrs', program: 'B.E. Computer' },
+    { date: '14 Apr 2026', session: 'Morning', subject: 'Operating Systems', code: 'CS403', time: '10:00 - 12:00', duration: '2 hrs', program: 'B.E. Computer' },
+    { date: '16 Apr 2026', session: 'Morning', subject: 'Computer Networks', code: 'CS404', time: '10:00 - 12:00', duration: '2 hrs', program: 'B.E. Computer' },
+    { date: '18 Apr 2026', session: 'Morning', subject: 'Software Engineering', code: 'CS405', time: '10:00 - 12:00', duration: '2 hrs', program: 'B.E. Computer' },
+    { date: '20 Apr 2026', session: 'Morning', subject: 'Mathematics IV', code: 'CS406', time: '10:00 - 13:00', duration: '3 hrs', program: 'B.E. Computer' },
+    { date: '10 Apr 2026', session: 'Morning', subject: 'Thermodynamics', code: 'ME401', time: '10:00 - 13:00', duration: '3 hrs', program: 'B.E. Mechanical' },
+    { date: '10 Apr 2026', session: 'Morning', subject: 'Structural Analysis', code: 'CE401', time: '10:00 - 13:00', duration: '3 hrs', program: 'B.E. Civil' },
+    { date: '10 Apr 2026', session: 'Morning', subject: 'Electrical Machines', code: 'EE401', time: '10:00 - 13:00', duration: '3 hrs', program: 'B.E. Electrical' },
+    { date: '10 Apr 2026', session: 'Morning', subject: 'Analog Electronics', code: 'EC401', time: '10:00 - 13:00', duration: '3 hrs', program: 'B.E. Electronics' },
+    { date: '12 Apr 2026', session: 'Morning', subject: 'Fluid Mechanics', code: 'ME402', time: '10:00 - 13:00', duration: '3 hrs', program: 'B.E. Mechanical' },
+    { date: '12 Apr 2026', session: 'Morning', subject: 'Hydraulics', code: 'CE402', time: '10:00 - 13:00', duration: '3 hrs', program: 'B.E. Civil' },
+    { date: '12 Apr 2026', session: 'Morning', subject: 'Power Systems', code: 'EE402', time: '10:00 - 13:00', duration: '3 hrs', program: 'B.E. Electrical' },
+    { date: '12 Apr 2026', session: 'Morning', subject: 'Digital Signal Processing', code: 'EC402', time: '10:00 - 13:00', duration: '3 hrs', program: 'B.E. Electronics' },
+    { date: '14 Apr 2026', session: 'Morning', subject: 'Machine Design', code: 'ME403', time: '10:00 - 12:00', duration: '2 hrs', program: 'B.E. Mechanical' },
+    { date: '14 Apr 2026', session: 'Morning', subject: 'Geotechnical Engineering', code: 'CE403', time: '10:00 - 12:00', duration: '2 hrs', program: 'B.E. Civil' },
+    { date: '14 Apr 2026', session: 'Morning', subject: 'Control Systems', code: 'EE403', time: '10:00 - 12:00', duration: '2 hrs', program: 'B.E. Electrical' },
+    { date: '14 Apr 2026', session: 'Morning', subject: 'Communication Systems', code: 'EC403', time: '10:00 - 12:00', duration: '2 hrs', program: 'B.E. Electronics' },
+    { date: '16 Apr 2026', session: 'Morning', subject: 'Manufacturing Processes', code: 'ME404', time: '10:00 - 12:00', duration: '2 hrs', program: 'B.E. Mechanical' },
+    { date: '16 Apr 2026', session: 'Morning', subject: 'Surveying', code: 'CE404', time: '10:00 - 12:00', duration: '2 hrs', program: 'B.E. Civil' },
+    { date: '16 Apr 2026', session: 'Morning', subject: 'Electrical Measurements', code: 'EE404', time: '10:00 - 12:00', duration: '2 hrs', program: 'B.E. Electrical' },
+    { date: '16 Apr 2026', session: 'Morning', subject: 'Microprocessors', code: 'EC404', time: '10:00 - 12:00', duration: '2 hrs', program: 'B.E. Electronics' },
+    { date: '18 Apr 2026', session: 'Morning', subject: 'Strength of Materials', code: 'ME405', time: '10:00 - 12:00', duration: '2 hrs', program: 'B.E. Mechanical' },
+    { date: '18 Apr 2026', session: 'Morning', subject: 'Concrete Technology', code: 'CE405', time: '10:00 - 12:00', duration: '2 hrs', program: 'B.E. Civil' },
+    { date: '18 Apr 2026', session: 'Morning', subject: 'Power Electronics', code: 'EE405', time: '10:00 - 12:00', duration: '2 hrs', program: 'B.E. Electrical' },
+    { date: '18 Apr 2026', session: 'Morning', subject: 'VLSI Design', code: 'EC405', time: '10:00 - 12:00', duration: '2 hrs', program: 'B.E. Electronics' },
+    { date: '20 Apr 2026', session: 'Morning', subject: 'Engineering Mathematics IV', code: 'ME406', time: '10:00 - 13:00', duration: '3 hrs', program: 'B.E. Mechanical' },
+    { date: '20 Apr 2026', session: 'Morning', subject: 'Engineering Mathematics IV', code: 'CE406', time: '10:00 - 13:00', duration: '3 hrs', program: 'B.E. Civil' },
+    { date: '20 Apr 2026', session: 'Morning', subject: 'Engineering Mathematics IV', code: 'EE406', time: '10:00 - 13:00', duration: '3 hrs', program: 'B.E. Electrical' },
+    { date: '20 Apr 2026', session: 'Morning', subject: 'Engineering Mathematics IV', code: 'EC406', time: '10:00 - 13:00', duration: '3 hrs', program: 'B.E. Electronics' },
   ],
   // Unified bundle lifecycle shared by Bundle Creation, Evaluator Assignment,
   // Marks Entry and Scrutiny — one bundle flows through all four pages:

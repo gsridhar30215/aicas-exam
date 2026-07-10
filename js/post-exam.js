@@ -65,7 +65,7 @@ function renderBundle() {
         <button class="btn btn-primary btn-sm" onclick="openCreateBundleModal('${subject.code}')" ${remainingSheets === 0 ? 'disabled title="All verified sheets for this subject are already bundled"' : ''}><i class="fas fa-plus"></i> Create Bundle</button>
       </div>
       <div class="card">
-        <div class="card-header"><h3><i class="fas fa-layer-group"></i> Answer Sheet Bundles — ${subject.name}</h3><span class="text-muted">${subjectBundles.length} bundle(s) · ${bundledSheets} sheets</span></div>
+        <div class="card-header"><h3><i class="fas fa-layer-group"></i> Answer Sheet Bundles — ${subject.name}</h3><div class="flex gap-2" style="align-items:center"><input type="text" class="form-control" style="max-width:200px" placeholder="Search..." oninput="liveSearchTable(this)"><span class="text-muted">${subjectBundles.length} bundle(s) · ${bundledSheets} sheets</span></div></div>
         <div class="card-body">
           <div class="table-wrap">
             <table>
@@ -119,7 +119,7 @@ function renderEvaluator() {
         <button class="btn btn-primary btn-sm" onclick="openAssignEvaluatorModal()" ${unassignedCount ? '' : 'disabled title="No unassigned bundles"'}><i class="fas fa-user-plus"></i> Assign Evaluator</button>
       </div>
       <div class="card">
-        <div class="card-header"><h3><i class="fas fa-chalkboard-teacher"></i> Evaluator Assignment</h3></div>
+        <div class="card-header"><h3><i class="fas fa-chalkboard-teacher"></i> Evaluator Assignment</h3><input type="text" class="form-control" style="max-width:200px" placeholder="Search..." oninput="liveSearchTable(this)"></div>
         <div class="card-body">
           <div class="table-wrap">
             <table>
@@ -167,7 +167,7 @@ function renderMarksEntry() {
         <button class="btn btn-success btn-sm" style="margin-left:auto" onclick="submitFinalMarks('${bundle.id}')"><i class="fas fa-check"></i> Submit Final Marks</button>
       </div>
       <div class="card">
-        <div class="card-header"><h3><i class="fas fa-pencil-alt"></i> Marks Entry — Bundle ${bundle.id}</h3><div class="flex gap-2"><button class="btn btn-sm" onclick="showActionModal('Draft Saved','Your marks entry progress for Bundle ${bundle.id} has been saved as a draft.', {icon:'fa-save', iconColor:'var(--success)', showCancel:false, confirmLabel:'OK'})"><i class="fas fa-save"></i> Save Draft</button></div></div>
+        <div class="card-header"><h3><i class="fas fa-pencil-alt"></i> Marks Entry — Bundle ${bundle.id}</h3><div class="flex gap-2"><input type="text" class="form-control" style="max-width:200px" placeholder="Search students..." oninput="liveSearchTable(this)"><button class="btn btn-sm" onclick="showActionModal('Draft Saved','Your marks entry progress for Bundle ${bundle.id} has been saved as a draft.', {icon:'fa-save', iconColor:'var(--success)', showCancel:false, confirmLabel:'OK'})"><i class="fas fa-save"></i> Save Draft</button></div></div>
         <div class="card-body">
           <div class="table-wrap">
             <table>
@@ -321,7 +321,7 @@ function renderScrutiny() {
         <button class="btn btn-sm" style="margin-left:auto" onclick="scrutinyApproveAll()" ${allPending.length ? '' : 'disabled title="Nothing pending review"'}><i class="fas fa-check"></i> Approve All</button>
       </div>
       <div class="card">
-        <div class="card-header"><h3><i class="fas fa-search"></i> Scrutiny Dashboard</h3></div>
+        <div class="card-header"><h3><i class="fas fa-search"></i> Scrutiny Dashboard</h3><input type="text" class="form-control" style="max-width:200px" placeholder="Search..." oninput="liveSearchTable(this)"></div>
         <div class="card-body">
           <div class="table-wrap">
             <table>
@@ -471,10 +471,19 @@ const resultExamSessions = [
   { id: 'Sem III Regular Dec 2024', live: false },
 ];
 let selectedResultExam = resultExamSessions[0].id;
+// Which subject the Result Review "All Student Marks" list is narrowed to
+// ('' = all subjects, all students, sorted highest to lowest).
+let resultReviewSubjectFilter = '';
 
 function changeResultExam(value) {
   selectedResultExam = value;
+  resultReviewSubjectFilter = '';
   showPage(currentPage);
+}
+
+function filterResultReviewSubject(value) {
+  resultReviewSubjectFilter = value;
+  showPage('result-freeze');
 }
 
 function confirmCalculateResults() {
@@ -672,7 +681,7 @@ function renderConsolidation() {
         <button class="btn btn-primary btn-sm" style="margin-left:auto" onclick="confirmValidateAllMarks()"><i class="fas fa-lock"></i> Validate & Lock All</button>
       </div>
       <div class="card">
-        <div class="card-header"><h3><i class="fas fa-layer-group"></i> Marks Consolidation Status</h3></div>
+        <div class="card-header"><h3><i class="fas fa-layer-group"></i> Marks Consolidation Status</h3><input type="text" class="form-control" style="max-width:200px" placeholder="Search..." oninput="liveSearchTable(this)"></div>
         <div class="card-body">
           <div class="table-wrap">
             <table>
@@ -735,7 +744,7 @@ function renderResultProcessing() {
         <div class="stat-card"><div class="label">Fail / Backlog</div><div class="value" style="color:var(--danger)">${summary.failCount}</div><div class="sub">${(100 - summary.passPercent).toFixed(1)}%${session.live ? ' (draft)' : ''}</div></div>
       </div>
       <div class="card">
-        <div class="card-header"><h3><i class="fas fa-calculator"></i> Result Calculation</h3><div class="flex gap-2">${actionBlock}</div></div>
+        <div class="card-header"><h3><i class="fas fa-calculator"></i> Result Calculation</h3><div class="flex gap-2"><input type="text" class="form-control" style="max-width:200px" placeholder="Search students..." oninput="liveSearchTable(this)">${actionBlock}</div></div>
         <div class="card-body">
           <div class="alert alert-info" style="margin-bottom:16px"><i class="fas fa-info-circle"></i> ${session.live ? 'Draft preview based on currently locked marks. Click above to finalize and proceed to Result Review & Freeze.' : 'Final result — already frozen and declared.'}</div>
           <div class="table-wrap">
@@ -765,11 +774,30 @@ function renderResultFreeze() {
   ).join('');
   const summary = getExamResultSummary(selectedResultExam);
   const subjectRows = summary.subjectStats.map(s =>
-    `<tr><td>${s.name}</td><td>${s.total}</td><td>${s.pass}</td><td>${s.fail}</td><td>${s.passPercent}%</td><td>${s.topperName}</td><td>${s.topperMarks}</td></tr>`
+    `<tr><td>${s.name} (${s.code})</td><td>${s.total}</td><td>${s.pass}</td><td>${s.fail}</td><td>${s.passPercent}%</td><td>${s.topperName}</td><td>${s.topperMarks}</td></tr>`
   ).join('');
   const reviewActions = session.live
     ? `<button class="btn btn-sm" onclick="showActionModal('Apply Moderation','Apply grace marks or moderation rules across subjects before freezing the result? This adjusts borderline pass/fail cases per institution policy.', {icon:'fa-gavel', confirmLabel:'Apply Moderation', confirmIcon:'fa-gavel', onConfirm:()=>showPage('result-freeze')})"><i class="fas fa-gavel"></i> Apply Moderation</button><button class="btn btn-success" onclick="confirmFreezeResult()"><i class="fas fa-lock"></i> Freeze Result</button>`
     : `<span class="badge badge-success" style="font-size:13px;padding:6px 12px"><i class="fas fa-lock"></i> Already Frozen</span>`;
+  // Every student's mark in every subject, flattened out of studentResults
+  // (already computed by getExamResultSummary) — optionally narrowed to one
+  // subject, always ranked highest mark first.
+  const allEntries = [];
+  summary.studentResults.forEach(sr => {
+    sr.subjectResults.forEach(sub => {
+      allEntries.push({ studentId: sr.id, studentName: sr.name, code: sub.code, subjectName: sub.name, mark: sub.mark, grade: sub.grade });
+    });
+  });
+  const filteredEntries = resultReviewSubjectFilter ? allEntries.filter(e => e.code === resultReviewSubjectFilter) : allEntries;
+  const rankedEntries = [...filteredEntries].sort((a, b) => b.mark - a.mark);
+  const subjectFilterSelect = `<select class="form-control" onchange="filterResultReviewSubject(this.value)">
+    <option value="">All Subjects</option>
+    ${summary.subjectStats.map(s => `<option value="${s.code}" ${resultReviewSubjectFilter === s.code ? 'selected' : ''}>${s.name} (${s.code})</option>`).join('')}
+  </select>`;
+  const gradeColor = (grade) => grade.startsWith('A') ? '#059669' : grade === 'B+' ? '#0284c7' : grade === 'B' ? '#ca8a04' : grade === 'F' ? '#dc2626' : 'var(--text)';
+  const studentMarksRows = rankedEntries.map((e, i) =>
+    `<tr><td>${i + 1}</td><td>${e.studentName} (${e.studentId})</td><td>${e.subjectName} (${e.code})</td><td style="font-weight:600">${e.mark}</td><td><span style="color:${gradeColor(e.grade)};font-weight:700">${e.grade}</span></td></tr>`
+  ).join('');
   return `
     <div class="page-content">
       <div class="alert alert-success"><i class="fas fa-check-circle"></i> ${modeAlert}</div>
@@ -783,12 +811,23 @@ function renderResultFreeze() {
         <div class="stat-card"><div class="label">Withheld</div><div class="value" style="color:var(--warning)">0</div><div class="sub">None flagged</div></div>
       </div>
       <div class="card mt-2">
-        <div class="card-header"><h3><i class="fas fa-clipboard-check"></i> Result Review</h3><div class="flex gap-2">${reviewActions}</div></div>
+        <div class="card-header"><h3><i class="fas fa-clipboard-check"></i> Result Review</h3><div class="flex gap-2"><input type="text" class="form-control" style="max-width:200px" placeholder="Search students..." oninput="liveSearchTable(this)">${reviewActions}</div></div>
         <div class="card-body">
           <div class="table-wrap">
             <table>
               <tr><th>Subject</th><th>Total</th><th>Pass</th><th>Fail</th><th>Pass %</th><th>Topper</th><th>Marks</th></tr>
               ${subjectRows}
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="card mt-2">
+        <div class="card-header"><h3><i class="fas fa-list-ol"></i> All Student Marks</h3><div class="flex gap-2" style="align-items:center">${subjectFilterSelect}<input type="text" class="form-control" style="max-width:200px" placeholder="Search students..." oninput="liveSearchTable(this)"></div></div>
+        <div class="card-body">
+          <div class="table-wrap">
+            <table>
+              <tr><th>Rank</th><th>Student</th><th>Subject</th><th>Marks</th><th>Grade</th></tr>
+              ${studentMarksRows || '<tr><td colspan="5" class="text-center text-muted" style="padding:20px">No marks found.</td></tr>'}
             </table>
           </div>
         </div>
@@ -996,6 +1035,7 @@ function downloadMarksMemo(studentId, studentName, memoNo, sgpa, cgpa, semesterL
   <tr><td style="font-weight:600;width:140px">Student Name</td><td>${studentName}</td></tr>
   <tr><td style="font-weight:600">Student ID</td><td>${studentId}</td></tr>
   <tr><td style="font-weight:600">Program</td><td>B.E. Computer Engineering</td></tr>
+  <tr><td style="font-weight:600">Program Code</td><td>${getProgramCode('B.E. Computer') || '—'}</td></tr>
   <tr><td style="font-weight:600">Semester</td><td>${semesterLabel}</td></tr>
   <tr><td style="font-weight:600">Memo Number</td><td>${memoNo}</td></tr>
 </table>
@@ -1213,7 +1253,7 @@ function renderMarksMemo() {
         <button class="btn btn-sm" style="margin-left:auto" onclick="openPublishMemosModal()"><i class="fas fa-check"></i> Publish to Portal</button>
       </div>
       <div class="card">
-        <div class="card-header"><h3><i class="fas fa-id-card"></i> Marks Memo / Grade Card</h3></div>
+        <div class="card-header"><h3><i class="fas fa-id-card"></i> Marks Memo / Grade Card</h3><input type="text" class="form-control" style="max-width:200px" placeholder="Search students..." oninput="liveSearchTable(this)"></div>
         <div class="card-body">
           <div class="table-wrap">
             <table>
@@ -1550,7 +1590,7 @@ function renderRevaluation() {
           <button class="btn btn-primary btn-sm" style="margin-left:auto" onclick="openTrackRevaluationModal()"><i class="fas fa-plus"></i> Track New Application</button>
         </div>
         <div class="card">
-          <div class="card-header"><h3><i class="fas fa-redo-alt"></i> University Revaluation Tracking</h3></div>
+          <div class="card-header"><h3><i class="fas fa-redo-alt"></i> University Revaluation Tracking</h3><input type="text" class="form-control" style="max-width:200px" placeholder="Search..." oninput="liveSearchTable(this)"></div>
           <div class="card-body">
             <div class="table-wrap">
               <table>
@@ -1592,7 +1632,7 @@ function renderRevaluation() {
         <button class="btn btn-primary btn-sm" style="margin-left:auto" onclick="openNewRevaluationModal()"><i class="fas fa-plus"></i> New Application</button>
       </div>
       <div class="card">
-        <div class="card-header"><h3><i class="fas fa-redo-alt"></i> Revaluation Applications</h3></div>
+        <div class="card-header"><h3><i class="fas fa-redo-alt"></i> Revaluation Applications</h3><input type="text" class="form-control" style="max-width:200px" placeholder="Search..." oninput="liveSearchTable(this)"></div>
         <div class="card-body">
           <div class="table-wrap">
             <table>
@@ -1629,6 +1669,7 @@ function renderStudentSeating() {
         </div>
         <div class="card-body">
           <div class="alert alert-info"><i class="fas fa-info-circle"></i> Your room and seat number for each exam. Arrive at least 30 minutes early and carry your hall ticket and a valid photo ID.</div>
+          <input type="text" class="form-control" style="max-width:200px;margin-bottom:12px" placeholder="Search..." oninput="liveSearchTable(this)">
           <div class="table-wrap">
             <table>
               <tr><th>Date</th><th>Session</th><th>Subject</th><th>Code</th><th>Time</th><th>Room</th><th>Seat No.</th></tr>
@@ -1691,6 +1732,7 @@ function downloadPastHallTicket(examLabel) {
   <tr><td style="font-weight:600">Student Name</td><td>Aarav Sharma</td></tr>
   <tr><td style="font-weight:600">Student ID</td><td>${CURRENT_STUDENT_ID}</td></tr>
   <tr><td style="font-weight:600">Program</td><td>B.E. Computer Engineering</td></tr>
+  <tr><td style="font-weight:600">Program Code</td><td>${getProgramCode('B.E. Computer') || '—'}</td></tr>
   <tr><td style="font-weight:600">Exam</td><td>${examLabel}</td></tr>
   <tr><td style="font-weight:600">Status</td><td>Completed</td></tr>
 </table>
@@ -1936,7 +1978,7 @@ function renderStudentRevaluation() {
   ).join('');
   const myApplicationsCard = `
       <div class="card" style="margin-top:16px">
-        <div class="card-header"><h3><i class="fas fa-history"></i> My Applications</h3></div>
+        <div class="card-header"><h3><i class="fas fa-history"></i> My Applications</h3><input type="text" class="form-control" style="max-width:200px" placeholder="Search..." oninput="liveSearchTable(this)"></div>
         <div class="card-body">
           ${appRows ? `
           <div class="table-wrap">
@@ -1971,7 +2013,7 @@ function renderStudentRevaluation() {
   return `
     <div class="page-content">
       <div class="card">
-        <div class="card-header"><h3><i class="fas fa-redo-alt"></i> Apply for Revaluation</h3></div>
+        <div class="card-header"><h3><i class="fas fa-redo-alt"></i> Apply for Revaluation</h3><input type="text" class="form-control" style="max-width:200px" placeholder="Search subjects..." oninput="liveSearchTable(this)"></div>
         <div class="card-body">
           <div class="alert alert-info"><i class="fas fa-info-circle"></i> Submit revaluation applications for your subjects. Fee: ₹500 per subject. Showing subjects from <strong>${sem.label}</strong>.</div>
           <div class="table-wrap">
@@ -2103,9 +2145,9 @@ function buildReportTable(examLabel, reportName) {
     const cfg = eligibilityExams[examLabel] || eligibilityExams['Sem IV Regular Apr 2026'];
     const rows = cfg.students.map(s => {
       const { eligible, reasons } = effectiveEligibility(s);
-      return `<tr><td>${s.id}</td><td>${s.name}</td><td>${s.program}</td><td>${s.sem}</td><td>${s.status}</td><td>${eligible ? 'Eligible' : 'Not Eligible'}</td><td>${reasons.length ? reasons.join(', ') : '—'}</td></tr>`;
+      return `<tr><td>${s.id}</td><td>${s.name}</td><td>${s.program}</td><td>${getProgramCode(s.program) || '—'}</td><td>${s.sem}</td><td>${s.status}</td><td>${eligible ? 'Eligible' : 'Not Eligible'}</td><td>${reasons.length ? reasons.join(', ') : '—'}</td></tr>`;
     }).join('');
-    return `<table>${th(['Student ID', 'Name', 'Program', 'Sem', 'Status', 'Eligibility', 'Reason(s)'])}${rows}</table>`;
+    return `<table>${th(['Student ID', 'Name', 'Program', 'Program Code', 'Sem', 'Status', 'Eligibility', 'Reason(s)'])}${rows}</table>`;
   }
   if (reportName === 'Registered Student List') {
     const roster = getRegistrationRoster(examLabel);
@@ -2151,8 +2193,8 @@ function buildReportTable(examLabel, reportName) {
     let rows = '';
     slots.forEach((slot, i) => {
       getInvigilatorAssignments(i).forEach(a => {
-        const faculty = a.facultyId ? findFaculty(a.facultyId) : null;
-        rows += `<tr><td>${slot.date}</td><td>${slot.session}</td><td>${a.room}</td><td>${faculty ? faculty.name : 'Not Assigned'}</td><td>${a.status}</td></tr>`;
+        const names = a.facultyIds.map(fid => findFaculty(fid)?.name).filter(Boolean);
+        rows += `<tr><td>${slot.date}</td><td>${slot.session}</td><td>${a.room}</td><td>${names.length ? names.join(', ') : 'Not Assigned'}</td><td>${a.status}</td></tr>`;
       });
     });
     return rows ? `<table>${th(['Date', 'Session', 'Room', 'Invigilator', 'Status'])}${rows}</table>` : noData(['Date', 'Session', 'Room', 'Invigilator', 'Status'], 'No invigilator assignments yet.');
@@ -2371,7 +2413,7 @@ function renderReports() {
       </div>
 
       <div class="card">
-        <div class="card-header"><h3><i class="fas fa-file-alt"></i> Available Reports</h3></div>
+        <div class="card-header"><h3><i class="fas fa-file-alt"></i> Available Reports</h3><input type="text" class="form-control" style="max-width:200px" placeholder="Search reports..." oninput="liveSearchTable(this)"></div>
         <div class="card-body">
           <div class="table-wrap">
             <table>

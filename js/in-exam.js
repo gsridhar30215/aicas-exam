@@ -28,12 +28,47 @@ function getAttendanceRoster(room) {
   return data.students.filter((s, i) => getStudentRoom(i) === room);
 }
 
+// Same Program Code/Admission Year/Serial Seat Number scheme as Hall Ticket
+// and Seating Plan (pre-exam.js), reimplemented standalone here since this
+// page doesn't load pre-exam.js — data.students is always the fixed Sem IV
+// B.E. Computer roster, so the prefix is just the one fixed "COMP/25"
+// rather than a general per-student lookup.
+function getAttendanceSeatNumbers() {
+  const sorted = [...data.students].sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
+  const map = {};
+  sorted.forEach((s, i) => { map[s.id] = `COMP/25/${String(i + 1).padStart(3, '0')}`; });
+  return map;
+}
+
 let selectedAttendanceSlotIndex = 0;
 let selectedAttendanceRoom = null;
 
 // Keyed by date|session|room so switching slot/room and coming back keeps
-// whatever was entered, instead of resetting on every render.
-const attendanceSessions = {};
+// whatever was entered, instead of resetting on every render. Lab 101/102
+// for the first slot come pre-submitted (as if invigilators already ran
+// that session) — Lab 101 is Verified, Lab 102 still Pending, so Answer
+// Sheet Capture has real mapped data in both states to filter on without
+// first having to visit Attendance. Student IDs here must match
+// getStudentRoom()'s index % data.rooms.length split (recompute this seed
+// if data.rooms' length ever changes).
+const attendanceSessions = {
+  '10 Apr 2026|Morning|Lab 101': {
+    submitted: true,
+    verified: true,
+    entries: {
+      S001: { status: 'Present', sheet: 'AS-1001', suppl: '' },
+      S009: { status: 'Present', sheet: 'AS-1002', suppl: '' },
+    },
+  },
+  '10 Apr 2026|Morning|Lab 102': {
+    submitted: true,
+    verified: false,
+    entries: {
+      S002: { status: 'Present', sheet: 'AS-1003', suppl: '' },
+      S010: { status: 'Present', sheet: 'AS-1004', suppl: '' },
+    },
+  },
+};
 
 function attendanceKey(date, session, room) {
   return `${date}|${session}|${room}`;
@@ -113,10 +148,11 @@ function renderAttendance() {
   const slotOptions = slots.map((s, i) => `<option value="${i}" ${i === idx ? 'selected' : ''}>${s.date} - ${s.session}</option>`).join('');
   const roomOptions = data.rooms.map(r => `<option value="${r.name}" ${r.name === room ? 'selected' : ''}>${r.name} - ${slot.subject}</option>`).join('');
   const isLocked = session.verified || session.submitted;
+  const seatNumbers = getAttendanceSeatNumbers();
   const rows = roster.map(s => {
     const entry = session.entries[s.id];
     return `<tr>
-      <td>${s.id}</td><td>${s.name}</td><td>${slot.subject}</td>
+      <td>${s.id}</td><td>${seatNumbers[s.id] || '—'}</td><td>${s.name}</td><td>${slot.subject}</td>
       <td><select class="form-control" id="att-status-${s.id}" style="width:auto;min-width:120px;padding:4px 8px" ${isLocked ? 'disabled' : ''}>${['Present', 'Absent', 'Malpractice', 'Withheld'].map(opt => `<option ${entry.status === opt ? 'selected' : ''}>${opt}</option>`).join('')}</select></td>
       <td><input class="form-control" id="att-sheet-${s.id}" style="width:120px;padding:4px 8px" placeholder="Booklet #" value="${entry.sheet}" ${isLocked ? 'disabled' : ''}></td>
       <td><input class="form-control" id="att-suppl-${s.id}" style="width:120px;padding:4px 8px" placeholder="Suppl. Booklet # (if any)" value="${entry.suppl}" ${isLocked ? 'disabled' : ''}></td>
@@ -138,12 +174,12 @@ function renderAttendance() {
         <button class="btn btn-primary btn-sm" style="margin-left:auto" onclick="submitAttendance()" ${session.submitted ? 'disabled title="Already submitted for this room"' : ''}><i class="fas fa-check"></i> Submit Attendance</button>
       </div>
       <div class="card">
-        <div class="card-header"><h3><i class="fas fa-clipboard-list"></i> Room ${room} - Student Attendance</h3><div class="flex gap-2"><button class="btn btn-sm btn-success" onclick="verifyAttendance()" ${(!session.submitted || session.verified) ? `disabled title="${session.verified ? 'Already verified' : 'Submit attendance first'}"` : ''}><i class="fas fa-lock"></i> Verify & Lock</button></div></div>
+        <div class="card-header"><h3><i class="fas fa-clipboard-list"></i> Room ${room} - Student Attendance</h3><div class="flex gap-2"><input type="text" class="form-control" style="max-width:200px" placeholder="Search students..." oninput="liveSearchTable(this)"><button class="btn btn-sm btn-success" onclick="verifyAttendance()" ${(!session.submitted || session.verified) ? `disabled title="${session.verified ? 'Already verified' : 'Submit attendance first'}"` : ''}><i class="fas fa-lock"></i> Verify & Lock</button></div></div>
         <div class="card-body">
           <div class="table-wrap">
             <table>
-              <tr><th>Student ID</th><th>Name</th><th>Subject</th><th>Attendance</th><th>Answer Sheet #</th><th>Suppl. Booklet #</th></tr>
-              ${rows || '<tr><td colspan="6" class="text-center text-muted" style="padding:20px">No students assigned to this room for this session.</td></tr>'}
+              <tr><th>Student ID</th><th>Seat No.</th><th>Name</th><th>Subject</th><th>Attendance</th><th>Answer Sheet #</th><th>Suppl. Booklet #</th></tr>
+              ${rows || '<tr><td colspan="7" class="text-center text-muted" style="padding:20px">No students assigned to this room for this session.</td></tr>'}
             </table>
           </div>
         </div>
@@ -161,14 +197,23 @@ function renderAttendance() {
 // here always traces back to a real Attendance entry, not a canned mock row.
 let selectedAnswerSheetSlotIndex = 0;
 let selectedAnswerSheetRoom = 'All Rooms';
+// Which Verified status the mapping table is narrowed to ('' = all).
+let selectedAnswerSheetVerified = '';
 
 function changeAnswerSheetSlot(value) {
   selectedAnswerSheetSlotIndex = Number(value);
+  selectedAnswerSheetVerified = '';
   showPage('answer-sheet');
 }
 
 function changeAnswerSheetRoom(value) {
   selectedAnswerSheetRoom = value;
+  selectedAnswerSheetVerified = '';
+  showPage('answer-sheet');
+}
+
+function filterAnswerSheetVerified(value) {
+  selectedAnswerSheetVerified = value;
   showPage('answer-sheet');
 }
 
@@ -192,10 +237,20 @@ function renderAnswerSheet() {
   const idx = Math.min(selectedAnswerSheetSlotIndex, slots.length - 1);
   const slot = slots[idx];
   const mapping = getAnswerSheetMapping(slot, selectedAnswerSheetRoom);
+  const displayMapping = selectedAnswerSheetVerified
+    ? mapping.filter(m => (selectedAnswerSheetVerified === 'Yes') === m.verified)
+    : mapping;
   const slotOptions = slots.map((s, i) => `<option value="${i}" ${i === idx ? 'selected' : ''}>${s.date} - ${s.session}</option>`).join('');
   const roomOptions = ['All Rooms', ...data.rooms.map(r => r.name)].map(r => `<option ${r === selectedAnswerSheetRoom ? 'selected' : ''}>${r}</option>`).join('');
-  const rows = mapping.map(({ student, room, entry, verified }) => `<tr>
+  const verifiedFilterSelect = `<select class="form-control" onchange="filterAnswerSheetVerified(this.value)">
+    <option value="">All Verified</option>
+    <option value="Yes" ${selectedAnswerSheetVerified === 'Yes' ? 'selected' : ''}>Verified</option>
+    <option value="Pending" ${selectedAnswerSheetVerified === 'Pending' ? 'selected' : ''}>Pending</option>
+  </select>`;
+  const seatNumbers = getAttendanceSeatNumbers();
+  const rows = displayMapping.map(({ student, room, entry, verified }) => `<tr>
       <td>${student.id} - ${student.name}</td>
+      <td>${seatNumbers[student.id] || '—'}</td>
       <td>${slot.subject}</td>
       <td>${room}</td>
       <td>${entry.sheet ? entry.sheet : '<span class="text-muted">Not recorded</span>'}</td>
@@ -208,16 +263,17 @@ function renderAnswerSheet() {
       <div class="filter-bar">
         <select class="form-control" onchange="changeAnswerSheetSlot(this.value)">${slotOptions}</select>
         <select class="form-control" onchange="changeAnswerSheetRoom(this.value)">${roomOptions}</select>
+        ${verifiedFilterSelect}
         <span class="chip"><i class="fas fa-file-alt"></i> ${mapping.length} sheet(s) mapped</span>
         <button class="btn btn-sm" style="margin-left:auto" onclick="showActionModal('Export Answer Sheet Report','The answer sheet / booklet number mapping report (${mapping.length} record(s)) has been exported.', {icon:'fa-file-export', confirmLabel:'Download', confirmIcon:'fa-download'})"><i class="fas fa-file-export"></i> Export Answer Sheet Report</button>
       </div>
       <div class="card">
-        <div class="card-header"><h3><i class="fas fa-file-alt"></i> Answer Sheet Number Mapping</h3></div>
+        <div class="card-header"><h3><i class="fas fa-file-alt"></i> Answer Sheet Number Mapping</h3><input type="text" class="form-control" style="max-width:200px" placeholder="Search..." oninput="liveSearchTable(this)"></div>
         <div class="card-body">
           <div class="table-wrap">
             <table>
-              <tr><th>Student</th><th>Subject</th><th>Room</th><th>Answer Sheet #</th><th>Suppl. Booklet #</th><th>Verified</th></tr>
-              ${rows || '<tr><td colspan="6" class="text-center text-muted" style="padding:20px">No attendance has been submitted for this date/session/room yet — go to Attendance to record it first.</td></tr>'}
+              <tr><th>Student</th><th>Seat No.</th><th>Subject</th><th>Room</th><th>Answer Sheet #</th><th>Suppl. Booklet #</th><th>Verified</th></tr>
+              ${rows || `<tr><td colspan="7" class="text-center text-muted" style="padding:20px">${mapping.length ? 'No records match this Verified filter.' : 'No attendance has been submitted for this date/session/room yet — go to Attendance to record it first.'}</td></tr>`}
             </table>
           </div>
         </div>
@@ -233,6 +289,8 @@ function viewMalpracticeCase(index) {
   const c = data.malpracticeCases[index];
   if (!c) return;
   const isUnderReview = c.status === 'Under Review';
+  const idMatch = /\(([^)]+)\)/.exec(c.student);
+  const seatNo = idMatch ? (getAttendanceSeatNumbers()[idMatch[1]] || '—') : '—';
   const body = `
     <div class="text-center" style="padding:8px 0 16px">
       <i class="fas fa-exclamation-triangle" style="font-size:40px;color:var(--danger)"></i>
@@ -240,6 +298,7 @@ function viewMalpracticeCase(index) {
     <table style="width:100%;border-collapse:collapse">
       <tr><td style="font-weight:600;padding:6px 0;width:140px">Date</td><td>${c.date}</td></tr>
       <tr><td style="font-weight:600;padding:6px 0">Student</td><td>${c.student}</td></tr>
+      <tr><td style="font-weight:600;padding:6px 0">Seat No.</td><td>${seatNo}</td></tr>
       <tr><td style="font-weight:600;padding:6px 0">Subject</td><td>${c.subject}</td></tr>
       <tr><td style="font-weight:600;padding:6px 0">Case Type</td><td><span class="badge ${c.typeClass}">${c.type}</span></td></tr>
       <tr><td style="font-weight:600;padding:6px 0">Remarks</td><td>${c.remarks}</td></tr>
@@ -261,7 +320,12 @@ function resolveMalpracticeCase(index) {
 }
 
 function renderMalpractice() {
-  const rows = data.malpracticeCases.map((c, i) => `<tr><td>${c.date}</td><td>${c.student}</td><td>${c.subject}</td><td><span class="badge ${c.typeClass}">${c.type}</span></td><td>${c.remarks}</td><td><span class="badge ${c.statusClass}">${c.status}</span></td><td><button class="btn btn-sm" onclick="viewMalpracticeCase(${i})">View</button></td></tr>`).join('');
+  const seatNumbers = getAttendanceSeatNumbers();
+  const rows = data.malpracticeCases.map((c, i) => {
+    const idMatch = /\(([^)]+)\)/.exec(c.student);
+    const seatNo = idMatch ? (seatNumbers[idMatch[1]] || '—') : '—';
+    return `<tr><td>${c.date}</td><td>${c.student}</td><td>${seatNo}</td><td>${c.subject}</td><td><span class="badge ${c.typeClass}">${c.type}</span></td><td>${c.remarks}</td><td><span class="badge ${c.statusClass}">${c.status}</span></td><td><button class="btn btn-sm" onclick="viewMalpracticeCase(${i})">View</button></td></tr>`;
+  }).join('');
   return `
     <div class="page-content">
       <div class="alert alert-warning"><i class="fas fa-exclamation-triangle"></i> Record special cases: malpractice, court case, withheld, blank booklet, mismatch, etc.</div>
@@ -270,11 +334,11 @@ function renderMalpractice() {
         <button class="btn btn-primary btn-sm" onclick="openRecordCaseModal()"><i class="fas fa-plus"></i> Record New Case</button>
       </div>
       <div class="card">
-        <div class="card-header"><h3><i class="fas fa-exclamation-circle"></i> Special Cases Recorded</h3><span class="text-muted">${data.malpracticeCases.length} case(s)</span></div>
+        <div class="card-header"><h3><i class="fas fa-exclamation-circle"></i> Special Cases Recorded</h3><div class="flex gap-2" style="align-items:center"><input type="text" class="form-control" style="max-width:200px" placeholder="Search..." oninput="liveSearchTable(this)"><span class="text-muted">${data.malpracticeCases.length} case(s)</span></div></div>
         <div class="card-body">
           <div class="table-wrap">
             <table>
-              <tr><th>Date</th><th>Student</th><th>Subject</th><th>Case Type</th><th>Remarks</th><th>Status</th><th></th></tr>
+              <tr><th>Date</th><th>Student</th><th>Seat No.</th><th>Subject</th><th>Case Type</th><th>Remarks</th><th>Status</th><th></th></tr>
               ${rows}
             </table>
           </div>
@@ -307,7 +371,7 @@ function renderDForm() {
         <button class="btn btn-sm" style="margin-left:auto" onclick="showActionModal('Download Report','The D-Form / attendance summary report has been downloaded.', {icon:'fa-download', confirmLabel:'Download', confirmIcon:'fa-download'})"><i class="fas fa-download"></i> Download Report</button>
       </div>
       <div class="card">
-        <div class="card-header"><h3><i class="fas fa-file-invoice"></i> D-Form / Attendance Summary</h3></div>
+        <div class="card-header"><h3><i class="fas fa-file-invoice"></i> D-Form / Attendance Summary</h3><input type="text" class="form-control" style="max-width:200px" placeholder="Search..." oninput="liveSearchTable(this)"></div>
         <div class="card-body">
           <div class="stats-grid" style="margin-bottom:0">
             <div class="stat-card"><div class="label">Registered</div><div class="value" style="color:var(--primary)">${summary.totalStudents}</div></div>
@@ -331,6 +395,76 @@ function renderDForm() {
 // 4.5 ANSWER SHEET COLLECTION & DISPATCH  (Exam Branch)
 // Autonomous -> move to Bundle Creation. Affiliated -> dispatch report.
 // ============================================================
+// Which subject/session the collection table is showing, and which Status
+// the table is narrowed to ('' = all) — same Subject-select + Status-filter
+// pairing used by Invigilator Duty and Seating Plan.
+let selectedCollectionSlotIndex = 0;
+let collectionStatusFilter = '';
+
+// Standalone Collection pages don't load pre-exam.js (see
+// getAttendanceSeatNumbers above for the same reasoning), so the other
+// exams' timetables are duplicated here in a light "date/subject/code"
+// shape — this page's per-room counts are already synthetic, not real
+// registered students, so only the subject list actually needs to match.
+const IN_EXAM_TIMETABLES = {
+  'Sem IV Regular Apr 2026': data.timetableSlots.filter(s => s.program === 'B.E. Computer' || !s.program),
+  'Sem VI Regular Apr 2026': [
+    { date: '08 Apr 2026', session: 'Morning', subject: 'Machine Learning', code: 'CS601' },
+    { date: '10 Apr 2026', session: 'Morning', subject: 'Cloud Computing', code: 'CS602' },
+    { date: '12 Apr 2026', session: 'Morning', subject: 'Big Data Analytics', code: 'CS603' },
+    { date: '14 Apr 2026', session: 'Morning', subject: 'Internet of Things', code: 'CS604' },
+    { date: '16 Apr 2026', session: 'Morning', subject: 'Deep Learning', code: 'CS605' },
+    { date: '18 Apr 2026', session: 'Morning', subject: 'Blockchain Technology', code: 'CS606' },
+  ],
+  'Sem II Supplementary Jan 2026': [
+    { date: '12 Jan 2026', session: 'Morning', subject: 'Mathematics I', code: 'SUP101' },
+    { date: '14 Jan 2026', session: 'Morning', subject: 'Physics', code: 'SUP102' },
+    { date: '16 Jan 2026', session: 'Morning', subject: 'Chemistry', code: 'SUP103' },
+    { date: '18 Jan 2026', session: 'Afternoon', subject: 'English', code: 'SUP104' },
+  ],
+};
+
+// Collection only covers each exam's own theory papers — this module is
+// scoped to a fixed synthetic room-count model (not real registered
+// students), so switching exams changes which subjects/dates are offered
+// but not how the per-room numbers are derived.
+function getCollectionSlots() {
+  return IN_EXAM_TIMETABLES[currentExamLabel] || IN_EXAM_TIMETABLES['Sem IV Regular Apr 2026'];
+}
+
+function changeCollectionExam(value) {
+  currentExamLabel = value;
+  selectedCollectionSlotIndex = 0;
+  collectionStatusFilter = '';
+  showPage('collection');
+}
+
+function changeCollectionSlot(value) {
+  selectedCollectionSlotIndex = Number(value);
+  showPage('collection');
+}
+
+function filterCollectionStatus(value) {
+  collectionStatusFilter = value;
+  showPage('collection');
+}
+
+// Deterministic (not real, but reproducible) per-room counts, varied a
+// little by slot index so switching subjects isn't just the same 5 rows
+// relabelled — Lecture Hall A drops one sheet on every other subject so the
+// Mismatch status/filter has something real to show.
+const COLLECTION_ROOM_BASELINE = { 'Lab 101': 30, 'Lab 102': 28, 'Lecture Hall A': 60, 'Lecture Hall B': 60, 'Seminar Hall': 70 };
+
+function getCollectionRows(slotIndex) {
+  return Object.entries(COLLECTION_ROOM_BASELINE).map(([room, baseline]) => {
+    const present = Math.max(0, baseline - (slotIndex % 3));
+    const mismatchHere = room === 'Lecture Hall A' && slotIndex % 2 === 0;
+    const collected = mismatchHere ? present - 1 : present;
+    const verified = collected === present;
+    return { room, present, collected, verified, status: verified ? 'Verified' : 'Mismatch' };
+  });
+}
+
 function renderCollection() {
   const isAffiliated = currentMode === 'affiliated';
   const modeAlert = isAffiliated
@@ -339,25 +473,43 @@ function renderCollection() {
   const verifyBtn = isAffiliated
     ? `<button class="btn btn-primary btn-sm" onclick="showActionModal('Collection Verified','Answer sheets verified against attendance. Proceed to generate the dispatch report for the university.', {icon:'fa-truck', confirmLabel:'Generate Dispatch Report', confirmIcon:'fa-truck'})"><i class="fas fa-check"></i> Verify Collection</button>`
     : `<button class="btn btn-primary btn-sm" onclick="showActionModal('Collection Verified','Answer sheets verified. Next step is Bundle Creation (Post-Exam) for evaluation.', {icon:'fa-check-circle', iconColor:'#059669', confirmLabel:'OK', confirmIcon:'fa-check'})"><i class="fas fa-check"></i> Verify Collection</button>`;
+
+  const slots = getCollectionSlots();
+  const idx = Math.min(selectedCollectionSlotIndex, slots.length - 1);
+  const slot = slots[idx];
+  const allRows = getCollectionRows(idx);
+  const displayRows = collectionStatusFilter ? allRows.filter(r => r.status === collectionStatusFilter) : allRows;
+  const slotOptions = slots.map((s, i) => `<option value="${i}" ${i === idx ? 'selected' : ''}>${s.date} - ${s.subject} (${s.code})</option>`).join('');
+  const statusFilterSelect = `<select class="form-control" onchange="filterCollectionStatus(this.value)">
+      <option value="">All Status</option>
+      <option value="Verified" ${collectionStatusFilter === 'Verified' ? 'selected' : ''}>Verified</option>
+      <option value="Mismatch" ${collectionStatusFilter === 'Mismatch' ? 'selected' : ''}>Mismatch</option>
+    </select>`;
+  const rows = displayRows.map(r => `<tr>
+      <td>${r.room}</td><td>${slot.subject}</td><td>${r.present}</td><td>${r.collected}</td>
+      <td><span class="badge ${r.verified ? 'badge-success' : 'badge-danger'}">${r.verified ? 'Yes' : 'No'}</span></td>
+      <td><span class="badge ${r.status === 'Verified' ? 'badge-success' : 'badge-warning'}">${r.status}</span></td>
+    </tr>`).join('');
+  const examOptions = Object.keys(IN_EXAM_TIMETABLES).map(key =>
+    `<option value="${key}" ${key === currentExamLabel ? 'selected' : ''}>${key}</option>`
+  ).join('');
   return `
     <div class="page-content">
       <div class="alert alert-info"><i class="fas fa-info-circle"></i> ${modeAlert}</div>
       <div class="filter-bar">
-        <select class="form-control"><option>Sem IV Regular Apr 2026</option></select>
+        <select class="form-control" onchange="changeCollectionExam(this.value)">${examOptions}</select>
+        <select class="form-control" onchange="changeCollectionSlot(this.value)">${slotOptions}</select>
+        ${statusFilterSelect}
         ${verifyBtn}
         <button class="btn btn-sm" style="margin-left:auto" onclick="showActionModal('Generate Dispatch Report','A dispatch report listing all collected answer sheets has been generated for submission.', {icon:'fa-truck', confirmLabel:'Download', confirmIcon:'fa-download'})"><i class="fas fa-truck"></i> Generate Dispatch Report</button>
       </div>
       <div class="card">
-        <div class="card-header"><h3><i class="fas fa-boxes"></i> Answer Sheet Collection Status</h3></div>
+        <div class="card-header"><h3><i class="fas fa-boxes"></i> Answer Sheet Collection Status — ${slot.subject} (${slot.date})</h3><div class="flex gap-2" style="align-items:center"><input type="text" class="form-control" style="max-width:200px" placeholder="Search..." oninput="liveSearchTable(this)"><span class="text-muted">${displayRows.length} room(s)</span></div></div>
         <div class="card-body">
           <div class="table-wrap">
             <table>
               <tr><th>Room</th><th>Subject</th><th>Present</th><th>Collected</th><th>Verified</th><th>Status</th></tr>
-              <tr><td>Lab 101</td><td>DS & Algorithms</td><td>30</td><td>30</td><td><span class="badge badge-success">Yes</span></td><td><span class="badge badge-success">Verified</span></td></tr>
-              <tr><td>Lab 102</td><td>DS & Algorithms</td><td>28</td><td>28</td><td><span class="badge badge-success">Yes</span></td><td><span class="badge badge-success">Verified</span></td></tr>
-              <tr><td>Lecture Hall A</td><td>DS & Algorithms</td><td>60</td><td>59</td><td><span class="badge badge-danger">No</span></td><td><span class="badge badge-warning">Mismatch</span></td></tr>
-              <tr><td>Lecture Hall B</td><td>DS & Algorithms</td><td>60</td><td>60</td><td><span class="badge badge-success">Yes</span></td><td><span class="badge badge-success">Verified</span></td></tr>
-              <tr><td>Seminar Hall</td><td>DS & Algorithms</td><td>70</td><td>70</td><td><span class="badge badge-success">Yes</span></td><td><span class="badge badge-success">Verified</span></td></tr>
+              ${rows || '<tr><td colspan="6" class="text-center text-muted" style="padding:20px">No rooms match this Status filter.</td></tr>'}
             </table>
           </div>
         </div>
